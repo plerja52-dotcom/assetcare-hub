@@ -13,6 +13,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as InstrumentsRouteImport } from './routes/instruments'
+import { Route as InputRouteImport } from './routes/input'
 import { Route as HealthRouteImport } from './routes/health'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -36,6 +37,11 @@ const InstrumentsRoute = InstrumentsRouteImport.update({
   path: '/instruments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InputRoute = InputRouteImport.update({
+  id: '/input',
+  path: '/input',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -50,6 +56,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/input': typeof InputRoute
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/input': typeof InputRoute
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/input': typeof InputRoute
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/health'
+    | '/input'
     | '/instruments'
     | '/maintenance'
     | '/notifications'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/health'
+    | '/input'
     | '/instruments'
     | '/maintenance'
     | '/notifications'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/health'
+    | '/input'
     | '/instruments'
     | '/maintenance'
     | '/notifications'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HealthRoute: typeof HealthRoute
+  InputRoute: typeof InputRoute
   InstrumentsRoute: typeof InstrumentsRoute
   MaintenanceRoute: typeof MaintenanceRoute
   NotificationsRoute: typeof NotificationsRoute
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstrumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/input': {
+      id: '/input'
+      path: '/input'
+      fullPath: '/input'
+      preLoaderRoute: typeof InputRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/health': {
       id: '/health'
       path: '/health'
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HealthRoute: HealthRoute,
+  InputRoute: InputRoute,
   InstrumentsRoute: InstrumentsRoute,
   MaintenanceRoute: MaintenanceRoute,
   NotificationsRoute: NotificationsRoute,
