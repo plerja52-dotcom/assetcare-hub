@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { KpiCard, PageHeader } from "@/components/kpi-card";
 import { useAppStore } from "@/lib/store";
@@ -10,6 +10,8 @@ import {
   Clock,
   AlertTriangle,
   PieChart as PieIcon,
+  BarChart3,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,17 +37,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
-const chartColors = [
-  "var(--chart-1)",
+const chartPalette = [
   "var(--chart-2)",
   "var(--chart-3)",
   "var(--chart-4)",
   "var(--chart-5)",
+  "var(--chart-1)",
 ];
 
 function ChartTooltip(props: any) {
@@ -68,6 +72,19 @@ function ChartTooltip(props: any) {
   );
 }
 
+function ChartEmpty({ label }: { label: string }) {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <EmptyState
+        compact
+        icon={BarChart3}
+        title="No data yet"
+        description={label}
+      />
+    </div>
+  );
+}
+
 function DashboardPage() {
   const { instruments, maintenance, settings } = useAppStore();
   const [unit, setUnit] = useState<string>("all");
@@ -86,10 +103,16 @@ function DashboardPage() {
     [instruments, maintenance, settings, filters],
   );
 
-  const pmCmData = [
-    { name: "Preventive", value: kpis.pmRatio, key: "PM" },
-    { name: "Corrective", value: kpis.cmRatio, key: "CM" },
-  ];
+  const hasAnyData = instruments.length > 0;
+  const hasMaintenance = maintenance.length > 0;
+
+  const pmCmData =
+    kpis.pmRatio !== null && kpis.cmRatio !== null
+      ? [
+          { name: "Preventive", value: kpis.pmRatio },
+          { name: "Corrective", value: kpis.cmRatio },
+        ]
+      : [];
 
   const perUnit = useMemo(() => {
     const map = new Map<string, number>();
@@ -97,10 +120,11 @@ function DashboardPage() {
       const ins = instruments.find((i) => i.id === m.instrumentId);
       if (!ins) return;
       if (filters.unit && ins.location !== filters.unit) return;
-      if (filters.criticality && ins.criticality !== filters.criticality) return;
+      if (filters.criticality && ins.criticality !== filters.criticality)
+        return;
       map.set(ins.location, (map.get(ins.location) ?? 0) + 1);
     });
-    return Array.from(map, ([unit, count]) => ({ unit, count }));
+    return Array.from(map, ([u, count]) => ({ unit: u, count }));
   }, [instruments, maintenance, filters]);
 
   const healthData = useMemo(() => {
@@ -115,14 +139,16 @@ function DashboardPage() {
         const s = healthScore(i, maintenance, settings);
         counts[healthBand(s, settings)]++;
       });
-    return [
+    const list = [
       { name: "Excellent", value: counts.Excellent, fill: "var(--success)" },
       { name: "Fair", value: counts.Fair, fill: "var(--warning)" },
       { name: "Poor", value: counts.Poor, fill: "var(--primary)" },
     ];
+    return list.some((d) => d.value > 0) ? list : [];
   }, [instruments, maintenance, settings, filters]);
 
   const monthlyTrend = useMemo(() => {
+    if (!hasMaintenance) return [];
     const now = new Date();
     const months: { month: string; count: number; downtime: number }[] = [];
     for (let i = 5; i >= 0; i--) {
@@ -133,7 +159,9 @@ function DashboardPage() {
       });
       const monthRecs = maintenance.filter((m) => {
         const md = new Date(m.dateTime);
-        return md.getMonth() === d.getMonth() && md.getFullYear() === d.getFullYear();
+        return (
+          md.getMonth() === d.getMonth() && md.getFullYear() === d.getFullYear()
+        );
       });
       months.push({
         month: label,
@@ -142,7 +170,7 @@ function DashboardPage() {
       });
     }
     return months;
-  }, [maintenance]);
+  }, [maintenance, hasMaintenance]);
 
   const units = Array.from(new Set(instruments.map((i) => i.location))).sort();
 
@@ -154,16 +182,22 @@ function DashboardPage() {
         actions={
           <>
             <Select value={unit} onValueChange={setUnit}>
-              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Unit" /></SelectTrigger>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Unit" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Units</SelectItem>
                 {units.map((u) => (
-                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                  <SelectItem key={u} value={u}>
+                    {u}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={criticality} onValueChange={setCriticality}>
-              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Criticality" /></SelectTrigger>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Criticality" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Criticality</SelectItem>
                 <SelectItem value="SCE">SCE</SelectItem>
@@ -176,77 +210,133 @@ function DashboardPage() {
         }
       />
 
+      {!hasAnyData && (
+        <Card className="mb-6">
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Wrench}
+              title="No instruments yet"
+              description="Add your first instrument to start tracking preventive and corrective maintenance across Area 2."
+              action={
+                <Button asChild>
+                  <Link to="/input">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Instrument
+                  </Link>
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        <KpiCard label="Total Instruments" value={kpis.totalInstruments} icon={Wrench} accent="info" trend={kpis.trend.mtbf} />
-        <KpiCard label="Availability" value={kpis.availability} suffix="%" icon={Activity} accent="success" trend={kpis.trend.availability} />
-        <KpiCard label="MTBF" value={kpis.mtbfDays} suffix="days" icon={Timer} accent="info" trend={kpis.trend.mtbf} />
-        <KpiCard label="MTTR" value={kpis.mttrHours} suffix="hrs" icon={Clock} accent="warning" trend={kpis.trend.mttr} />
-        <KpiCard label="Overdue Calibrations" value={kpis.overdueCalibrations} icon={AlertTriangle} accent="primary" trend={kpis.trend.overdue} />
-        <KpiCard label="PM vs CM Ratio" value={`${kpis.pmRatio}/${kpis.cmRatio}`} suffix="%" icon={PieIcon} accent="sce" />
+        <KpiCard label="Total Instruments" value={kpis.totalInstruments} icon={Wrench} accent="info" />
+        <KpiCard label="Availability" value={kpis.availability} suffix="%" icon={Activity} accent="success" decimals={2} />
+        <KpiCard label="MTBF" value={kpis.mtbfDays} suffix="days" icon={Timer} accent="info" />
+        <KpiCard label="MTTR" value={kpis.mttrHours} suffix="hrs" icon={Clock} accent="warning" decimals={2} />
+        <KpiCard label="Overdue Calibrations" value={kpis.overdueCalibrations} icon={AlertTriangle} accent={kpis.overdueCalibrations > 0 ? "primary" : "info"} />
+        <KpiCard
+          label="PM vs CM Ratio"
+          value={kpis.pmRatio !== null ? `${kpis.pmRatio}/${kpis.cmRatio}` : null}
+          suffix="%"
+          icon={PieIcon}
+          accent="sce"
+        />
       </div>
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-1">
-          <CardHeader><CardTitle className="text-base">PM vs CM Distribution</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">PM vs CM Distribution</CardTitle>
+          </CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pmCmData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={4}>
-                  {pmCmData.map((_, i) => (
-                    <Cell key={i} fill={i === 0 ? "var(--info)" : "var(--primary)"} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {pmCmData.length === 0 ? (
+              <ChartEmpty label="Log a PM or CM record to see the distribution." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pmCmData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={4}>
+                    {pmCmData.map((_, i) => (
+                      <Cell key={i} fill={i === 0 ? "var(--info)" : "var(--warning)"} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Maintenance Activity per Unit</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Maintenance Activity per Unit</CardTitle>
+          </CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={perUnit}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="unit" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {perUnit.length === 0 ? (
+              <ChartEmpty label="Once maintenance is logged, activity per unit will show here." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={perUnit}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="unit" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
+                  <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {perUnit.map((_, i) => (
+                      <Cell key={i} fill={chartPalette[i % chartPalette.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-1">
-          <CardHeader><CardTitle className="text-base">Health Score Distribution</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Health Score Distribution</CardTitle>
+          </CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={healthData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={4}>
-                  {healthData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {healthData.length === 0 ? (
+              <ChartEmpty label="Add instruments to see their health distribution." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={healthData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={4}>
+                    {healthData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Monthly Maintenance & Downtime Trend</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Maintenance & Downtime Trend</CardTitle>
+          </CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis dataKey="month" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }} />
-                <Line type="monotone" dataKey="count" name="Activities" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="downtime" name="Downtime (hrs)" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {monthlyTrend.length === 0 ? (
+              <ChartEmpty label="Trend will populate as maintenance is logged over time." />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="month" stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
+                  <YAxis stroke="var(--muted-foreground)" tick={{ fontSize: 12 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted-foreground)" }} />
+                  <Line type="monotone" dataKey="count" name="Records" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="downtime" name="Downtime (h)" stroke="var(--chart-4)" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
