@@ -14,8 +14,11 @@ import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as InstrumentsRouteImport } from './routes/instruments'
 import { Route as InputRouteImport } from './routes/input'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as HealthRouteImport } from './routes/health'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -42,9 +45,19 @@ const InputRoute = InputRouteImport.update({
   path: '/input',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HealthRoute = HealthRouteImport.update({
   id: '/health',
   path: '/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -52,73 +65,99 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/health': typeof HealthRoute
+  '/help': typeof HelpRoute
   '/input': typeof InputRoute
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
   '/settings': typeof SettingsRoute
+  '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/health': typeof HealthRoute
+  '/help': typeof HelpRoute
   '/input': typeof InputRoute
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
   '/settings': typeof SettingsRoute
+  '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/health': typeof HealthRoute
+  '/help': typeof HelpRoute
   '/input': typeof InputRoute
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
   '/settings': typeof SettingsRoute
+  '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/health'
+    | '/help'
     | '/input'
     | '/instruments'
     | '/maintenance'
     | '/notifications'
     | '/settings'
+    | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/health'
+    | '/help'
     | '/input'
     | '/instruments'
     | '/maintenance'
     | '/notifications'
     | '/settings'
+    | '/admin/users'
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/health'
+    | '/help'
     | '/input'
     | '/instruments'
     | '/maintenance'
     | '/notifications'
     | '/settings'
+    | '/admin/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   HealthRoute: typeof HealthRoute
+  HelpRoute: typeof HelpRoute
   InputRoute: typeof InputRoute
   InstrumentsRoute: typeof InstrumentsRoute
   MaintenanceRoute: typeof MaintenanceRoute
   NotificationsRoute: typeof NotificationsRoute
   SettingsRoute: typeof SettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -158,11 +197,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InputRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/health': {
       id: '/health'
       path: '/health'
       fullPath: '/health'
       preLoaderRoute: typeof HealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -172,28 +225,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   HealthRoute: HealthRoute,
+  HelpRoute: HelpRoute,
   InputRoute: InputRoute,
   InstrumentsRoute: InstrumentsRoute,
   MaintenanceRoute: MaintenanceRoute,
   NotificationsRoute: NotificationsRoute,
   SettingsRoute: SettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

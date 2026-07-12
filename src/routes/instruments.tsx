@@ -125,7 +125,12 @@ function InstrumentsPage() {
               {shown.map((i) => {
                 const score = healthScore(i, maintenance, settings);
                 return (
-                  <TableRow key={i.id} className="cursor-pointer" onClick={() => setSelected(i)}>
+                  <TableRow
+                    key={i.id}
+                    className="cursor-pointer hover:bg-muted/40 transition-colors"
+                    onClick={() => setSelected(i)}
+                  >
+
                     <TableCell className="font-medium">{i.tagNumber}</TableCell>
                     <TableCell>{i.name}</TableCell>
                     <TableCell>{i.location}</TableCell>
@@ -136,7 +141,30 @@ function InstrumentsPage() {
                 );
               })}
               {shown.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No instruments match your filters.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="p-0">
+                    <div className="py-10 text-center">
+                      <p className="text-sm font-medium">
+                        {instruments.length === 0
+                          ? "No instruments yet"
+                          : "No instruments match your filters"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {instruments.length === 0
+                          ? "Add your first instrument to start tracking maintenance."
+                          : "Try clearing filters to see everything."}
+                      </p>
+                      {instruments.length === 0 && (
+                        <Button asChild size="sm" className="mt-4">
+                          <Link to="/input">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Instrument
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
