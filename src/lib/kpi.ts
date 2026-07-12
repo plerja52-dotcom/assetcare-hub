@@ -77,7 +77,6 @@ export function healthScore(
     else if (days < 14) score -= 5;
   }
 
-  // calibration drift
   const last = insRecords
     .filter((r) => r.calibrationAfter !== undefined)
     .sort((a, b) => (a.dateTime < b.dateTime ? 1 : -1))[0];
@@ -100,18 +99,13 @@ export function healthBand(
 
 export interface DashboardKPIs {
   totalInstruments: number;
-  availability: number;
-  mtbfDays: number;
-  mttrHours: number;
+  availability: number | null;
+  mtbfDays: number | null;
+  mttrHours: number | null;
   overdueCalibrations: number;
-  pmRatio: number;
-  cmRatio: number;
-  trend: {
-    availability: number;
-    mtbf: number;
-    mttr: number;
-    overdue: number;
-  };
+  pmRatio: number | null;
+  cmRatio: number | null;
+  hasData: boolean;
 }
 
 export function computeKPIs(
@@ -136,17 +130,22 @@ export function computeKPIs(
   const cm = recs.filter((r) => r.type === "CM");
   const pm = recs.filter((r) => r.type === "PM");
 
-  const totalHours = 24 * 30 * Math.max(1, filteredInstruments.length);
+  const hasInstruments = filteredInstruments.length > 0;
+  const totalHours = hasInstruments ? 24 * 30 * filteredInstruments.length : 0;
   const totalDowntime = recs.reduce((s, r) => s + (r.downtimeHours ?? 0), 0);
   const availability =
-    totalHours > 0 ? ((totalHours - totalDowntime) / totalHours) * 100 : 100;
+    totalHours > 0
+      ? +(((totalHours - totalDowntime) / totalHours) * 100).toFixed(2)
+      : null;
 
   const mtbfDays =
     cm.length > 0
       ? Math.round((filteredInstruments.length * 30) / cm.length)
-      : filteredInstruments.length * 30;
+      : hasInstruments
+        ? filteredInstruments.length * 30
+        : null;
   const totalRepair = cm.reduce((s, r) => s + (r.repairTimeHours ?? 0), 0);
-  const mttrHours = cm.length > 0 ? +(totalRepair / cm.length).toFixed(2) : 0;
+  const mttrHours = cm.length > 0 ? +(totalRepair / cm.length).toFixed(2) : null;
 
   const overdue = filteredInstruments.filter((i) =>
     isOverdue(i, maintenance, settings),
@@ -155,17 +154,12 @@ export function computeKPIs(
   const total = pm.length + cm.length;
   return {
     totalInstruments: filteredInstruments.length,
-    availability: +availability.toFixed(2),
+    availability,
     mtbfDays,
     mttrHours,
     overdueCalibrations: overdue,
-    pmRatio: total ? Math.round((pm.length / total) * 100) : 0,
-    cmRatio: total ? Math.round((cm.length / total) * 100) : 0,
-    trend: {
-      availability: 0.4,
-      mtbf: 2.1,
-      mttr: -0.3,
-      overdue: -1,
-    },
+    pmRatio: total ? Math.round((pm.length / total) * 100) : null,
+    cmRatio: total ? Math.round((cm.length / total) * 100) : null,
+    hasData: recs.length > 0 || hasInstruments,
   };
 }
