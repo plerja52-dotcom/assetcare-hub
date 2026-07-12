@@ -137,7 +137,7 @@ function MaintenancePage() {
             </TableHeader>
             <TableBody>
               {filtered.map((m) => (
-                <TableRow key={m.id}>
+                <TableRow key={m.id} className="hover:bg-muted/40 transition-colors">
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{new Date(m.dateTime).toLocaleDateString()}</TableCell>
                   <TableCell className="font-medium">{m.tagNumber}</TableCell>
                   <TableCell><TypeBadge value={m.type} /></TableCell>
@@ -150,7 +150,16 @@ function MaintenancePage() {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No records.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={9} className="p-0">
+                    <div className="py-10 text-center">
+                      <p className="text-sm font-medium">No maintenance records yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Log a PM or CM activity from the Input Data page.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
