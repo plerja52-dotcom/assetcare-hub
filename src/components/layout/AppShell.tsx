@@ -15,10 +15,11 @@ import {
   HelpCircle,
   LogOut,
   User as UserIcon,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
-import logoAsset from "@/assets/pertamina-logo.png.asset.json";
+import { Brand } from "@/components/brand";
 import { cn } from "@/lib/utils";
 import { useAuthStore, useCurrentUser } from "@/lib/auth-store";
 import {
@@ -41,26 +42,6 @@ const nav = [
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
-function Brand() {
-  return (
-    <Link to="/" className="flex items-center gap-3 min-w-0">
-      <img
-        src={logoAsset.url}
-        alt="Pertamina"
-        className="h-9 w-auto shrink-0 object-contain"
-      />
-      <div className="hidden sm:block min-w-0">
-        <div className="text-sm font-semibold leading-tight truncate text-foreground">
-          Reliability Instrumentation
-        </div>
-        <div className="text-[11px] text-muted-foreground leading-tight truncate">
-          Maintenance Area 2 – RU VI Balongan
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
@@ -74,9 +55,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
             to={n.to}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
               active
-                ? "bg-primary/10 text-primary"
+                ? "bg-primary/10 text-primary shadow-sm"
                 : "text-muted-foreground hover:bg-accent hover:text-foreground",
             )}
           >
@@ -97,13 +78,9 @@ function ThemeToggle() {
       size="icon"
       onClick={toggle}
       aria-label="Toggle theme"
-      className="h-9 w-9"
+      className="h-9 w-9 rounded-full hover:bg-accent transition-all"
     >
-      {theme === "dark" ? (
-        <Sun className="h-4 w-4" />
-      ) : (
-        <Moon className="h-4 w-4" />
-      )}
+      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
   );
 }
@@ -119,13 +96,11 @@ function UserMenu() {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  const isAdmin = user.role === "Admin";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="h-9 gap-2 px-2 hover:bg-accent"
-        >
+        <Button variant="ghost" className="h-9 gap-2 px-2 hover:bg-accent rounded-full">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
             {initials || <UserIcon className="h-3.5 w-3.5" />}
           </div>
@@ -134,17 +109,19 @@ function UserMenu() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-56 glass-surface">
         <DropdownMenuLabel>
           <div className="text-sm font-medium">{user.name}</div>
-          <div className="text-xs text-muted-foreground font-normal">
-            {user.email}
-          </div>
-          <div className="text-[11px] mt-1 text-primary font-medium">
-            {user.role}
-          </div>
+          <div className="text-xs text-muted-foreground font-normal">{user.email}</div>
+          <div className="text-[11px] mt-1 text-primary font-medium">{user.role}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {isAdmin && (
+          <DropdownMenuItem onSelect={() => navigate({ to: "/admin/users" })}>
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            User Management
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onSelect={() => {
             setCurrent(null);
@@ -163,9 +140,9 @@ function UserMenu() {
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState(false);
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b bg-background/80 backdrop-blur px-4 md:px-6">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      {/* Header — liquid glass */}
+      <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/60 glass-surface px-4 md:px-6">
         <Button
           variant="ghost"
           size="icon"
@@ -183,11 +160,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="flex">
-        {/* Sidebar desktop */}
-        <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col border-r bg-sidebar min-h-[calc(100vh-4rem)] sticky top-16">
+        {/* Sidebar — liquid glass */}
+        <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col border-r border-border/60 glass-sidebar min-h-[calc(100vh-4rem)] sticky top-16">
           <NavList />
           <div className="mt-auto p-3 text-[11px] text-muted-foreground">
-            v1.1 · Cloudflare-ready
+            v1.2 · Cloudflare-ready
           </div>
         </aside>
 
@@ -195,11 +172,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {drawer && (
           <div className="fixed inset-0 z-50 md:hidden">
             <div
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
               onClick={() => setDrawer(false)}
             />
-            <div className="absolute left-0 top-0 h-full w-72 bg-sidebar border-r shadow-xl flex flex-col animate-in slide-in-from-left">
-              <div className="flex items-center justify-between h-16 px-4 border-b">
+            <div className="absolute left-0 top-0 h-full w-72 glass-sidebar border-r border-border/60 shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
+              <div className="flex items-center justify-between h-16 px-4 border-b border-border/60">
                 <Brand />
                 <Button
                   variant="ghost"
@@ -215,7 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 min-w-0 p-4 md:p-8 animate-in fade-in duration-200">
+        <main className="flex-1 min-w-0 p-4 md:p-8 animate-in fade-in duration-300">
           {children}
         </main>
       </div>

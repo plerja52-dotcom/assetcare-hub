@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-export type Role = "Admin" | "Engineer" | "Viewer";
+export type Role = "Admin" | "User";
 
 export interface AuthUser {
   id: string;
@@ -14,6 +14,11 @@ export interface AuthUser {
 export interface StoredUser extends AuthUser {
   passwordHash: string; // simple SHA-256 hex — client-side only fallback
   salt: string;
+}
+
+// Migrate any legacy Engineer/Viewer accounts to the simplified User role.
+function normalizeRole(r: unknown): Role {
+  return r === "Admin" ? "Admin" : "User";
 }
 
 interface AuthState {
@@ -34,10 +39,14 @@ export const useAuthStore = create<AuthState>()(
       users: [],
       bootstrapped: false,
       setCurrent: (id) => set({ currentUserId: id }),
-      addUser: (u) => set((s) => ({ users: [...s.users, u] })),
+      addUser: (u) => set((s) => ({ users: [...s.users, { ...u, role: normalizeRole(u.role) }] })),
       updateUser: (id, patch) =>
         set((s) => ({
-          users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)),
+          users: s.users.map((u) =>
+            u.id === id
+              ? { ...u, ...patch, role: patch.role ? normalizeRole(patch.role) : u.role }
+              : u,
+          ),
         })),
       removeUser: (id) =>
         set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
@@ -50,6 +59,12 @@ export const useAuthStore = create<AuthState>()(
           ? window.localStorage
           : { getItem: () => null, setItem: () => {}, removeItem: () => {} },
       ),
+      // Normalize on rehydrate so old Engineer/Viewer accounts become Users.
+      onRehydrateStorage: () => (state) => {
+        if (state?.users) {
+          state.users = state.users.map((u) => ({ ...u, role: normalizeRole(u.role) }));
+        }
+      },
     },
   ),
 );
@@ -77,5 +92,10 @@ export function useCurrentUser(): AuthUser | null {
   const u = users.find((x) => x.id === currentUserId);
   if (!u || !u.active) return null;
   const { passwordHash: _p, salt: _s, ...pub } = u;
-  return pub;
+  return { ...pub, role: normalizeRole(pub.role) };
+}
+
+export function useIsAdmin(): boolean {
+  const u = useCurrentUser();
+  return u?.role === "Admin";
 }

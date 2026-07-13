@@ -1,7 +1,14 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/kpi-card";
-import { useCurrentUser, useAuthStore, hashPassword, randomSalt, type Role, type StoredUser } from "@/lib/auth-store";
+import {
+  useCurrentUser,
+  useAuthStore,
+  hashPassword,
+  randomSalt,
+  type Role,
+  type StoredUser,
+} from "@/lib/auth-store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,31 +36,45 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/users")({
+  head: () => ({
+    meta: [{ title: "User Management — Pertamina Reliability" }],
+  }),
   component: AdminUsersPage,
 });
 
 function AdminUsersPage() {
   const me = useCurrentUser();
-  if (!me) return <Navigate to="/auth" />;
-  if (me.role !== "Admin") return <Navigate to="/" />;
+  const navigate = useNavigate();
 
+  // Redirect non-admins BEFORE painting any admin content.
+  useEffect(() => {
+    if (me && me.role !== "Admin") navigate({ to: "/", replace: true });
+  }, [me, navigate]);
+
+  if (!me) return <Navigate to="/auth" />;
+  if (me.role !== "Admin") return null;
+
+  return <AdminUsersInner meId={me.id} />;
+}
+
+function AdminUsersInner({ meId }: { meId: string }) {
   const { users, addUser, updateUser } = useAuthStore();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<StoredUser | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("Engineer");
+  const [role, setRole] = useState<Role>("User");
   const [password, setPassword] = useState("");
 
   function reset() {
     setEditing(null);
     setName("");
     setEmail("");
-    setRole("Engineer");
+    setRole("User");
     setPassword("");
   }
 
@@ -151,13 +172,19 @@ function AdminUsersPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Engineer">Engineer</SelectItem>
-                      <SelectItem value="Viewer">Viewer</SelectItem>
+                      <SelectItem value="User">User</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Admins have full access including Backup &amp; Reset and User
+                    Management. Users can operate everything except Backup / Reset
+                    and User Management.
+                  </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{editing ? "New password (leave blank to keep current)" : "Password"}</Label>
+                  <Label>
+                    {editing ? "New password (leave blank to keep current)" : "Password"}
+                  </Label>
                   <Input
                     type="password"
                     value={password}
@@ -181,8 +208,9 @@ function AdminUsersPage() {
             <div className="font-medium">Hidden admin route</div>
             <div className="text-muted-foreground text-xs mt-0.5">
               This page is only reachable at{" "}
-              <code className="text-foreground">/admin/users</code> and only by
-              accounts with the <strong>Admin</strong> role.
+              <code className="text-foreground">/admin/users</code> or from your
+              profile menu, and only by accounts with the <strong>Admin</strong>{" "}
+              role.
             </div>
           </div>
         </CardContent>
@@ -221,7 +249,7 @@ function AdminUsersPage() {
                     <Button size="sm" variant="outline" onClick={() => openEdit(u)}>
                       Edit
                     </Button>
-                    {u.id !== me.id && (
+                    {u.id !== meId && (
                       <Button
                         size="sm"
                         variant="ghost"

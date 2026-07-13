@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   salt          TEXT NOT NULL,
-  role          TEXT NOT NULL CHECK (role IN ('Admin','Engineer','Viewer')),
+  role          TEXT NOT NULL CHECK (role IN ('Admin','User')),
   active        INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -50,7 +50,6 @@ CREATE INDEX IF NOT EXISTS idx_maint_instrument ON maintenance_records(instrumen
 CREATE INDEX IF NOT EXISTS idx_maint_datetime ON maintenance_records(date_time);
 CREATE INDEX IF NOT EXISTS idx_maint_type ON maintenance_records(type);
 
--- Settings is a single row keyed by id=1; JSON-encoded blobs for the array fields.
 CREATE TABLE IF NOT EXISTS settings (
   id                          INTEGER PRIMARY KEY CHECK (id = 1),
   instrument_types_json       TEXT NOT NULL,
@@ -66,7 +65,6 @@ CREATE TABLE IF NOT EXISTS escalation_rules (
   recipients  TEXT NOT NULL DEFAULT ''
 );
 
--- Auth sessions (JWT is stateless, but this table lets Admins revoke sessions).
 CREATE TABLE IF NOT EXISTS sessions (
   id         TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
