@@ -11,7 +11,7 @@ import {
   useAuthStore,
   type StoredUser,
 } from "@/lib/auth-store";
-import logoAsset from "@/assets/pertamina-logo.png.asset.json";
+import { Brand } from "@/components/brand";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
@@ -54,9 +54,7 @@ function AuthPage() {
       const user = users.find(
         (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
       );
-      const attemptHash = user
-        ? await hashPassword(password, user.salt)
-        : null;
+      const attemptHash = user ? await hashPassword(password, user.salt) : null;
       if (!user || !user.active || user.passwordHash !== attemptHash) {
         setError("Invalid email or password.");
         return;
@@ -101,25 +99,18 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 relative overflow-hidden">
-      {/* Subtle branded background */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.06]">
+      <div className="absolute inset-0 pointer-events-none opacity-[0.08]">
         <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-primary blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-info blur-3xl" />
+        <div className="absolute top-1/3 left-1/2 h-72 w-72 rounded-full bg-success blur-3xl" />
       </div>
 
-      <Card className="w-full max-w-sm relative z-10 shadow-lg">
+      <Card className="w-full max-w-sm relative z-10 glass-panel border-0">
         <CardContent className="p-8">
           <div className="flex flex-col items-center text-center mb-6">
-            <img
-              src={logoAsset.url}
-              alt="Pertamina"
-              className="h-12 w-auto mb-3"
-            />
-            <div className="text-base font-semibold text-foreground">
-              Reliability Instrumentation
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Maintenance Area 2 – RU VI Balongan
+            <Brand size="lg" showSubtitle={false} linkTo={null} />
+            <div className="text-xs text-muted-foreground mt-3">
+              Reliability Instrumentation · Maintenance Area 2 · RU VI Balongan
             </div>
           </div>
 
@@ -162,13 +153,9 @@ function AuthPage() {
                     minLength={8}
                     required
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Minimum 8 characters.
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">Minimum 8 characters.</p>
                 </div>
-                {error && (
-                  <p className="text-xs text-primary font-medium">{error}</p>
-                )}
+                {error && <p className="text-xs text-primary font-medium">{error}</p>}
                 <Button type="submit" className="w-full" disabled={busy}>
                   {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Create Admin & Sign In
