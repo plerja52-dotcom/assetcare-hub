@@ -13,7 +13,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { ThemeProvider } from "../lib/theme";
+import { ThemeProvider, THEME_INIT_SCRIPT } from "../lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { useAuthStore } from "@/lib/auth-store";
 
@@ -88,10 +88,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap",
       },
+    ],
+    scripts: [
+      // Runs BEFORE hydration so the correct theme class is on <html>
+      // from first paint. Prevents flash and stops the "theme flips
+      // on its own" bug caused by re-reading OS prefs on every mount.
+      { children: THEME_INIT_SCRIPT },
     ],
   }),
   shellComponent: RootShell,
