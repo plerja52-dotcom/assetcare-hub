@@ -1,37 +1,34 @@
-import type { Instrument, MaintenanceRecord, Settings } from "./types";
+import type { Instrument, PmTaskRecord, Settings } from "./types";
 
-// Seed data intentionally left empty — app starts clean on every install.
-// Defaults for settings (health thresholds, calibration intervals, escalation)
-// live here because they are configuration, not user data.
+// Real-world equipment types seen in the Area 2 PM/PdM tracker.
+const EQUIPMENT_TYPES = [
+  "Junction Box",
+  "Control Valve",
+  "Transmitter",
+  "PSA Unit",
+  "Local Panel",
+  "Switch",
+  "Vibration Monitor",
+];
+
+// Areas as they appear in the real files — mix of numeric and short codes.
+const AREAS = ["12", "14", "22", "AHU", "HTU", "DHC"];
+
 export const defaultSettings: Settings = {
-  instrumentTypes: [
-    "Flow Meter",
-    "Temperature Element",
-    "Pressure Transmitter",
-    "Control Valve",
-    "Level Transmitter",
-    "Gas Detector",
-    "Analyzer",
-  ],
-  intervals: [
-    { type: "Flow Meter", pmIntervalDays: 180, calibrationIntervalDays: 180 },
-    { type: "Temperature Element", pmIntervalDays: 365, calibrationIntervalDays: 365 },
-    { type: "Pressure Transmitter", pmIntervalDays: 180, calibrationIntervalDays: 180 },
-    { type: "Control Valve", pmIntervalDays: 90, calibrationIntervalDays: 180 },
-    { type: "Level Transmitter", pmIntervalDays: 180, calibrationIntervalDays: 180 },
-    { type: "Gas Detector", pmIntervalDays: 90, calibrationIntervalDays: 90 },
-    { type: "Analyzer", pmIntervalDays: 90, calibrationIntervalDays: 90 },
-  ],
-  calibrationTolerancePct: 2,
-  healthExcellentMin: 90,
-  healthFairMin: 70,
-  escalation: [
-    { criticality: "SCE", recipients: "" },
-    { criticality: "High", recipients: "" },
-    { criticality: "Medium", recipients: "" },
-    { criticality: "Low", recipients: "" },
-  ],
+  areas: AREAS,
+  equipmentTypes: EQUIPMENT_TYPES,
+  frequencyByType: {
+    "Junction Box":       { count: 1, unit: "tahun" },
+    "Control Valve":      { count: 6, unit: "bulan" },
+    "Transmitter":        { count: 1, unit: "tahun" },
+    "PSA Unit":           { count: 3, unit: "bulan" },
+    "Local Panel":        { count: 1, unit: "tahun" },
+    "Switch":             { count: 1, unit: "tahun" },
+    "Vibration Monitor":  { count: 1, unit: "bulan" },
+  },
+  upcomingWindowDays: 14,
+  escalation: AREAS.map((a) => ({ area: a, recipients: "" })),
 };
 
 export const seedInstruments: Instrument[] = [];
-export const seedMaintenance: MaintenanceRecord[] = [];
+export const seedTasks: PmTaskRecord[] = [];
