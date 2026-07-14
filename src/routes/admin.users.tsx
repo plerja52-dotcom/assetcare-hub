@@ -1,273 +1,290 @@
-import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/kpi-card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  useCurrentUser,
-  useAuthStore,
-  hashPassword,
-  randomSalt,
-  type Role,
-  type StoredUser,
-} from "@/lib/auth-store";
-import { Card, CardContent } from "@/components/ui/card";
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EmptyState } from "@/components/empty-state";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Plus, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+  hashPassword, randomSalt, useAuthStore, useIsAdmin, type Role, type StoredUser,
+} from "@/lib/auth-store";
 import { toast } from "sonner";
+import { useState } from "react";
+import { Check, ShieldCheck, ShieldOff, Trash2, UserPlus, X, XCircle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/admin/users")({
-  head: () => ({
-    meta: [{ title: "User Management — Pertamina Reliability" }],
-  }),
+  head: () => ({ meta: [{ title: "User Management — Pertamina Reliability Instrumentation" }] }),
   component: AdminUsersPage,
 });
 
 function AdminUsersPage() {
-  const me = useCurrentUser();
-  const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
+  const {
+    users, sessions, addUser, updateUser, removeUser, approveUser, rejectUser, revokeSession,
+  } = useAuthStore();
 
-  // Redirect non-admins BEFORE painting any admin content.
-  useEffect(() => {
-    if (me && me.role !== "Admin") navigate({ to: "/", replace: true });
-  }, [me, navigate]);
-
-  if (!me) return <Navigate to="/auth" />;
-  if (me.role !== "Admin") return null;
-
-  return <AdminUsersInner meId={me.id} />;
-}
-
-function AdminUsersInner({ meId }: { meId: string }) {
-  const { users, addUser, updateUser } = useAuthStore();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<StoredUser | null>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("User");
-  const [password, setPassword] = useState("");
-
-  function reset() {
-    setEditing(null);
-    setName("");
-    setEmail("");
-    setRole("User");
-    setPassword("");
+  if (!isAdmin) {
+    return (
+      <AppShell>
+        <PageHeader title="User Management" />
+        <Card className="glass-panel border-0">
+          <CardContent className="p-8">
+            <EmptyState icon={ShieldOff} title="Admins only" description="You need an Admin role to view this page." />
+          </CardContent>
+        </Card>
+      </AppShell>
+    );
   }
 
-  function openNew() {
-    reset();
-    setOpen(true);
-  }
-  function openEdit(u: StoredUser) {
-    setEditing(u);
-    setName(u.name);
-    setEmail(u.email);
-    setRole(u.role);
-    setPassword("");
-    setOpen(true);
-  }
-
-  async function save() {
-    if (!name.trim() || !email.trim()) {
-      toast.error("Name and email required");
-      return;
-    }
-    if (editing) {
-      const patch: Partial<StoredUser> = {
-        name: name.trim(),
-        email: email.trim(),
-        role,
-      };
-      if (password) {
-        const salt = randomSalt();
-        patch.salt = salt;
-        patch.passwordHash = await hashPassword(password, salt);
-      }
-      updateUser(editing.id, patch);
-      toast.success("User updated");
-    } else {
-      if (password.length < 8) {
-        toast.error("Password must be at least 8 characters");
-        return;
-      }
-      if (users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
-        toast.error("Email already exists");
-        return;
-      }
-      const salt = randomSalt();
-      addUser({
-        id: crypto.randomUUID(),
-        name: name.trim(),
-        email: email.trim(),
-        role,
-        active: true,
-        salt,
-        passwordHash: await hashPassword(password, salt),
-      });
-      toast.success("User created");
-    }
-    setOpen(false);
-    reset();
-  }
+  const pending = users.filter((u) => u.status === "pending");
+  const active = users.filter((u) => u.status !== "pending");
 
   return (
     <AppShell>
-      <PageHeader
-        title="User Management"
-        description="Admin-only: create, edit, and deactivate user accounts."
-        actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openNew}>
-                <Plus className="h-4 w-4 mr-1" />
-                New User
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editing ? "Edit user" : "Create user"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Role</Label>
-                  <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="User">User</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Admins have full access including Backup &amp; Reset and User
-                    Management. Users can operate everything except Backup / Reset
-                    and User Management.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>
-                    {editing ? "New password (leave blank to keep current)" : "Password"}
-                  </Label>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    minLength={editing ? 0 : 8}
-                  />
-                </div>
-                <Button onClick={save} className="w-full">
-                  {editing ? "Save changes" : "Create user"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        }
-      />
+      <PageHeader title="User Management" description="Approve requests, manage accounts and roles, monitor sessions." />
+      <Tabs defaultValue="users">
+        <TabsList className="glass-surface border border-border/60">
+          <TabsTrigger value="users">Users <Badge variant="secondary" className="ml-1.5">{active.length}</Badge></TabsTrigger>
+          <TabsTrigger value="pending">Pending Requests
+            {pending.length > 0 && <Badge className="ml-1.5 bg-primary text-primary-foreground">{pending.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="sessions">Sessions <Badge variant="secondary" className="ml-1.5">{sessions.filter(s => !s.revoked).length}</Badge></TabsTrigger>
+        </TabsList>
 
-      <Card className="mb-4 border-info/30 bg-info/5">
-        <CardContent className="p-4 flex items-start gap-3">
-          <ShieldCheck className="h-5 w-5 text-info shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <div className="font-medium">Hidden admin route</div>
-            <div className="text-muted-foreground text-xs mt-0.5">
-              This page is only reachable at{" "}
-              <code className="text-foreground">/admin/users</code> or from your
-              profile menu, and only by accounts with the <strong>Admin</strong>{" "}
-              role.
-            </div>
+        <TabsContent value="users">
+          <div className="grid gap-4 md:grid-cols-[1fr_320px] mt-2">
+            <UsersTable users={active} updateUser={updateUser} removeUser={removeUser} />
+            <NewUserCard addUser={addUser} existing={users} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="pending">
+          <Card className="glass-panel border-0 mt-2">
+            <CardContent className="p-0">
+              {pending.length === 0 ? (
+                <EmptyState icon={Check} title="No pending requests" description="Self-registered accounts will show up here for approval." />
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pending.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {u.createdAt ? new Date(u.createdAt).toLocaleString() : "—"}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button size="sm" onClick={() => { approveUser(u.id); toast.success(`${u.name} approved`); }}>
+                            <Check className="h-4 w-4 mr-1" />Approve
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { rejectUser(u.id); toast.success(`${u.name} rejected`); }}>
+                            <XCircle className="h-4 w-4 mr-1" />Reject
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sessions">
+          <Card className="glass-panel border-0 mt-2">
+            <CardContent className="p-0">
+              {sessions.length === 0 ? (
+                <EmptyState icon={ShieldCheck} title="No sessions recorded" />
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Logged in</TableHead>
+                      <TableHead>Last active</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.userName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(s.loginAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {new Date(s.lastActiveAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {s.revoked
+                            ? <Badge variant="outline" className="text-primary border-primary/40">Revoked</Badge>
+                            : <Badge variant="outline" className="text-success border-success/40">Active</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" disabled={s.revoked}
+                            onClick={() => { revokeSession(s.id); toast.success("Session revoked"); }}>
+                            <X className="h-4 w-4 mr-1" />Revoke
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </AppShell>
+  );
+}
+
+function UsersTable({ users, updateUser, removeUser }: {
+  users: StoredUser[];
+  updateUser: (id: string, patch: Partial<StoredUser>) => void;
+  removeUser: (id: string) => void;
+}) {
+  const [confirmDel, setConfirmDel] = useState<StoredUser | null>(null);
+  return (
+    <>
+      <Card className="glass-panel border-0">
+        <CardContent className="p-0">
+          {users.length === 0 ? (
+            <EmptyState icon={UserPlus} title="No approved users yet" />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+                    <TableCell>
+                      <Select value={u.role} onValueChange={(v) => updateUser(u.id, { role: v as Role })}>
+                        <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="User">User</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant={u.active ? "outline" : "default"}
+                        onClick={() => updateUser(u.id, { active: !u.active })}>
+                        {u.active ? "Active" : "Disabled"}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => setConfirmDel(u)} aria-label="Delete user">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id} className="hover:bg-muted/40 transition-colors">
-                  <TableCell className="font-medium">{u.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                  <TableCell>{u.role}</TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        u.active
-                          ? "text-xs px-2 py-0.5 rounded-full bg-success/15 text-success"
-                          : "text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                      }
-                    >
-                      {u.active ? "Active" : "Inactive"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button size="sm" variant="outline" onClick={() => openEdit(u)}>
-                      Edit
-                    </Button>
-                    {u.id !== meId && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          updateUser(u.id, { active: !u.active });
-                          toast.success(u.active ? "User deactivated" : "User activated");
-                        }}
-                      >
-                        {u.active ? "Deactivate" : "Activate"}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-    </AppShell>
+      <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
+        <AlertDialogContent className="glass-panel border-0">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDel && `${confirmDel.name} (${confirmDel.email}) will be permanently removed.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-primary text-primary-foreground hover:opacity-90"
+              onClick={() => { if (confirmDel) { removeUser(confirmDel.id); toast.success("User removed"); setConfirmDel(null); } }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function NewUserCard({ addUser, existing }: {
+  addUser: (u: StoredUser) => void;
+  existing: StoredUser[];
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<Role>("User");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name || !email || password.length < 8) { toast.error("Fill in all fields (min 8-char password)"); return; }
+    if (existing.some((u) => u.email.toLowerCase() === email.toLowerCase())) { toast.error("Email already exists"); return; }
+    setBusy(true);
+    try {
+      const salt = randomSalt();
+      const passwordHash = await hashPassword(password, salt);
+      addUser({
+        id: crypto.randomUUID(), name, email, role,
+        active: true, status: "approved",
+        salt, passwordHash, createdAt: new Date().toISOString(),
+      });
+      toast.success(`${name} added`);
+      setName(""); setEmail(""); setPassword("");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Card className="glass-panel border-0">
+      <CardHeader><CardTitle className="text-base">Add User</CardTitle></CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="space-y-3">
+          <div><Label>Full name</Label><Input value={name} onChange={(e) => setName(e.target.value)} required /></div>
+          <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+          <div><Label>Temporary password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></div>
+          <div><Label>Role</Label>
+            <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="User">User</SelectItem>
+                <SelectItem value="Admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button type="submit" className="w-full" disabled={busy}><UserPlus className="h-4 w-4 mr-1.5" />Create user</Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
