@@ -1,231 +1,203 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/kpi-card";
 import { useAppStore } from "@/lib/store";
-import { CriticalityBadge, HealthBadge } from "@/components/badges";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+import { AreaBadge } from "@/components/badges";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { Wrench, Plus, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useMemo, useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { healthBand, healthScore, nextCalibrationDate } from "@/lib/kpi";
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import type { Instrument } from "@/lib/types";
 
 export const Route = createFileRoute("/instruments")({
+  head: () => ({ meta: [{ title: "Instruments — Pertamina Reliability Instrumentation" }] }),
   component: InstrumentsPage,
 });
 
 function InstrumentsPage() {
-  const { instruments, maintenance, settings } = useAppStore();
+  const { instruments, tasks, settings, removeInstrument } = useAppStore();
   const [q, setQ] = useState("");
-  const [unit, setUnit] = useState("all");
-  const [type, setType] = useState("all");
-  const [crit, setCrit] = useState("all");
+  const [area, setArea] = useState("all");
+  const [equip, setEquip] = useState("all");
   const [selected, setSelected] = useState<Instrument | null>(null);
-  const [page, setPage] = useState(1);
-  const perPage = 10;
+  const [confirmDel, setConfirmDel] = useState<Instrument | null>(null);
 
-  const units = Array.from(new Set(instruments.map((i) => i.location))).sort();
-
-  const filtered = useMemo(() => {
-    return instruments.filter((i) => {
-      if (q && !`${i.tagNumber} ${i.name}`.toLowerCase().includes(q.toLowerCase())) return false;
-      if (unit !== "all" && i.location !== unit) return false;
-      if (type !== "all" && i.type !== type) return false;
-      if (crit !== "all" && i.criticality !== crit) return false;
-      return true;
-    });
-  }, [instruments, q, unit, type, crit]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const shown = filtered.slice((page - 1) * perPage, page * perPage);
+  const filtered = useMemo(() =>
+    instruments.filter((i) =>
+      (area === "all" || i.area === area) &&
+      (equip === "all" || i.equipmentType === equip) &&
+      (q === "" || `${i.tagNumber} ${i.equipmentType} ${i.lokasi ?? ""}`.toLowerCase().includes(q.toLowerCase())),
+    ), [instruments, q, area, equip]);
 
   return (
     <AppShell>
       <PageHeader
         title="Instrument Master Data"
-        description="Inventory and specification of all instruments in Area 2."
+        description="Every physical asset tracked across Maintenance Area 2."
         actions={
-          <Button asChild>
-            <Link to="/input"><Plus className="h-4 w-4 mr-1" />Add Instrument</Link>
-          </Button>
+          <Button asChild><Link to="/input"><Plus className="h-4 w-4 mr-1" />Add Instrument</Link></Button>
         }
       />
 
-      <Card className="p-4 mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="relative">
+      <Card className="glass-panel border-0 mb-4">
+        <CardContent className="p-4 flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search tag or name..." className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input placeholder="Search tag, equipment, location…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
           </div>
-          <Select value={unit} onValueChange={setUnit}>
-            <SelectTrigger><SelectValue placeholder="Unit" /></SelectTrigger>
+          <Select value={area} onValueChange={setArea}>
+            <SelectTrigger className="w-32"><SelectValue placeholder="Area" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Units</SelectItem>
-              {units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+              <SelectItem value="all">All Areas</SelectItem>
+              {settings.areas.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+          <Select value={equip} onValueChange={setEquip}>
+            <SelectTrigger className="w-48"><SelectValue placeholder="Equipment" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {settings.instrumentTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              <SelectItem value="all">All Equipment</SelectItem>
+              {settings.equipmentTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={crit} onValueChange={setCrit}>
-            <SelectTrigger><SelectValue placeholder="Criticality" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Criticality</SelectItem>
-              <SelectItem value="SCE">SCE</SelectItem>
-              <SelectItem value="High">High</SelectItem>
-              <SelectItem value="Medium">Medium</SelectItem>
-              <SelectItem value="Low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tag Number</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Criticality</TableHead>
-                <TableHead>Health</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((i) => {
-                const score = healthScore(i, maintenance, settings);
-                return (
-                  <TableRow
-                    key={i.id}
-                    className="cursor-pointer hover:bg-muted/40 transition-colors"
-                    onClick={() => setSelected(i)}
-                  >
-
-                    <TableCell className="font-medium">{i.tagNumber}</TableCell>
-                    <TableCell>{i.name}</TableCell>
-                    <TableCell>{i.location}</TableCell>
-                    <TableCell className="text-muted-foreground">{i.type}</TableCell>
-                    <TableCell><CriticalityBadge value={i.criticality} /></TableCell>
-                    <TableCell><HealthBadge score={score} band={healthBand(score, settings)} /></TableCell>
+      <Card className="glass-panel border-0">
+        <CardContent className="p-0">
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={Wrench}
+              title={instruments.length === 0 ? "No instruments yet" : "No matches"}
+              description={instruments.length === 0
+                ? "Add your first instrument to get started."
+                : "Try clearing the filters or search text."}
+              action={instruments.length === 0
+                ? <Button asChild><Link to="/input"><Plus className="h-4 w-4 mr-1" />Add Instrument</Link></Button>
+                : undefined}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tag Number</TableHead>
+                    <TableHead>Area</TableHead>
+                    <TableHead>Equipment</TableHead>
+                    <TableHead>Lokasi</TableHead>
+                    <TableHead>PM Frequency</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                );
-              })}
-              {shown.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="p-0">
-                    <div className="py-10 text-center">
-                      <p className="text-sm font-medium">
-                        {instruments.length === 0
-                          ? "No instruments yet"
-                          : "No instruments match your filters"}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {instruments.length === 0
-                          ? "Add your first instrument to start tracking maintenance."
-                          : "Try clearing filters to see everything."}
-                      </p>
-                      {instruments.length === 0 && (
-                        <Button asChild size="sm" className="mt-4">
-                          <Link to="/input">
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add Instrument
-                          </Link>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((i) => (
+                    <TableRow key={i.id} className="cursor-pointer" onClick={() => setSelected(i)}>
+                      <TableCell className="font-mono text-xs font-semibold">{i.tagNumber}</TableCell>
+                      <TableCell><AreaBadge value={i.area} /></TableCell>
+                      <TableCell className="text-sm">{i.equipmentType}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{i.lokasi || "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {i.pmFrequency ? `${i.pmFrequency.count} ${i.pmFrequency.unit}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDel(i); }}
+                          aria-label="Delete instrument"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between p-3 border-t text-sm">
-          <span className="text-muted-foreground">
-            {filtered.length} instrument{filtered.length !== 1 && "s"} · Page {page} of {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
-          </div>
-        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto p-6">
+        <SheetContent className="glass-panel border-0 sm:max-w-md">
           {selected && (
             <>
               <SheetHeader>
-                <SheetTitle>{selected.tagNumber}</SheetTitle>
-                <SheetDescription>{selected.name}</SheetDescription>
+                <SheetTitle className="font-mono">{selected.tagNumber}</SheetTitle>
               </SheetHeader>
-              <div className="mt-5 space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><div className="text-muted-foreground text-xs">Unit</div><div>{selected.location}</div></div>
-                  <div><div className="text-muted-foreground text-xs">Type</div><div>{selected.type}</div></div>
-                  <div><div className="text-muted-foreground text-xs">Criticality</div><div><CriticalityBadge value={selected.criticality} /></div></div>
-                  <div><div className="text-muted-foreground text-xs">Commissioned</div><div>{selected.commissioningDate ?? "—"}</div></div>
-                  <div><div className="text-muted-foreground text-xs">Running Hours</div><div>{selected.runningHours ?? "—"}</div></div>
-                  <div><div className="text-muted-foreground text-xs">Next Calibration</div><div>{nextCalibrationDate(selected, maintenance, settings)?.toLocaleDateString() ?? "—"}</div></div>
-                </div>
-                <div>
-                  <div className="text-sm font-semibold mb-2">Health Score</div>
-                  <HealthBadge score={healthScore(selected, maintenance, settings)} band={healthBand(healthScore(selected, maintenance, settings), settings)} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold mb-2">Maintenance History</div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {maintenance
-                      .filter((m) => m.instrumentId === selected.id)
-                      .sort((a, b) => (a.dateTime < b.dateTime ? 1 : -1))
-                      .map((m) => (
-                        <div key={m.id} className="rounded-md border p-3 text-sm">
-                          <div className="flex justify-between">
-                            <span className="font-medium">{m.type} · {m.activity}</span>
-                            <span className="text-xs text-muted-foreground">{new Date(m.dateTime).toLocaleDateString()}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">By {m.technician} · {m.finalStatus}</div>
-                        </div>
-                      ))}
-                    {maintenance.filter((m) => m.instrumentId === selected.id).length === 0 && (
-                      <div className="text-sm text-muted-foreground">No history yet.</div>
-                    )}
+              <div className="mt-6 space-y-3 text-sm">
+                <Row label="Area"><AreaBadge value={selected.area} /></Row>
+                <Row label="Equipment">{selected.equipmentType}</Row>
+                <Row label="Lokasi">{selected.lokasi || "—"}</Row>
+                <Row label="PM Frequency">
+                  {selected.pmFrequency ? `${selected.pmFrequency.count} ${selected.pmFrequency.unit}` : "—"}
+                </Row>
+                <Row label="Task Records">
+                  {tasks.filter((t) => t.instrumentId === selected.id).length}
+                </Row>
+                {selected.createdBy && (
+                  <div className="pt-3 text-[11px] text-muted-foreground border-t border-border/60">
+                    Added by {selected.createdBy}
+                    {selected.createdAt && ` on ${new Date(selected.createdAt).toLocaleDateString()}`}
                   </div>
+                )}
+                <div className="pt-4">
+                  <Button variant="destructive" size="sm" onClick={() => { setConfirmDel(selected); setSelected(null); }}>
+                    <Trash2 className="h-4 w-4 mr-1.5" /> Delete instrument
+                  </Button>
                 </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!confirmDel} onOpenChange={(o) => !o && setConfirmDel(null)}>
+        <AlertDialogContent className="glass-panel border-0">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete instrument?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDel && (() => {
+                const n = tasks.filter((t) => t.instrumentId === confirmDel.id).length;
+                return `${confirmDel.tagNumber} will be removed${n ? ` along with ${n} related PM task record${n === 1 ? "" : "s"}` : ""}. This cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary text-primary-foreground hover:opacity-90"
+              onClick={() => {
+                if (!confirmDel) return;
+                removeInstrument(confirmDel.id);
+                toast.success(`${confirmDel.tagNumber} deleted`);
+                setConfirmDel(null);
+              }}
+            >Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[110px_1fr] items-center gap-3">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</div>
+      <div className="text-sm">{children}</div>
+    </div>
   );
 }

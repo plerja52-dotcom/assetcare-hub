@@ -1,165 +1,134 @@
-import type {
-  Instrument,
-  MaintenanceRecord,
-  Settings,
-} from "./types";
+import type { Instrument, PmTaskRecord, Settings, TaskStatus } from "./types";
 
+export function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+export function todayISO() {
+  return startOfDay(new Date()).toISOString().slice(0, 10);
+}
+export function isSameMonth(iso: string, ref: Date) {
+  const d = new Date(iso);
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
+}
 export function daysBetween(a: Date, b: Date) {
-  return Math.floor((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.floor((startOfDay(a).getTime() - startOfDay(b).getTime()) / 86400000);
 }
 
-export function lastMaintenance(
-  instrumentId: string,
-  records: MaintenanceRecord[],
-) {
-  return records
-    .filter((r) => r.instrumentId === instrumentId)
-    .sort((a, b) => (a.dateTime < b.dateTime ? 1 : -1))[0];
+/** Auto-derive status from dates. Preserves manual Inprogress override. */
+export function deriveStatus(t: Pick<PmTaskRecord, "planDate" | "actualDate" | "manualStatus" | "status">): TaskStatus {
+  if (t.actualDate) return "Finish";
+  if (t.manualStatus && t.status === "Inprogress") return "Inprogress";
+  const today = startOfDay(new Date());
+  const plan = startOfDay(new Date(t.planDate));
+  if (plan.getTime() < today.getTime()) return "Behind";
+  return "Scheduled";
 }
 
-export function nextCalibrationDate(
-  ins: Instrument,
-  records: MaintenanceRecord[],
-  settings: Settings,
-): Date | null {
-  const rule = settings.intervals.find((r) => r.type === ins.type);
-  if (!rule) return null;
-  const cals = records
-    .filter(
-      (r) =>
-        r.instrumentId === ins.id &&
-        r.activity.toLowerCase().includes("calibration"),
-    )
-    .sort((a, b) => (a.dateTime < b.dateTime ? 1 : -1));
-  const base = cals[0]
-    ? new Date(cals[0].dateTime)
-    : ins.commissioningDate
-      ? new Date(ins.commissioningDate)
-      : new Date();
-  const d = new Date(base);
-  d.setDate(d.getDate() + rule.calibrationIntervalDays);
-  return d;
+/** Recompute status for a batch — call whenever dates change. */
+export function recomputeStatuses(tasks: PmTaskRecord[]): PmTaskRecord[] {
+  return tasks.map((t) => ({ ...t, status: deriveStatus(t) }));
 }
 
-export function isOverdue(
-  ins: Instrument,
-  records: MaintenanceRecord[],
-  settings: Settings,
-) {
-  const next = nextCalibrationDate(ins, records, settings);
-  if (!next) return false;
-  return next.getTime() < Date.now();
-}
-
-export function daysUntilCalibration(
-  ins: Instrument,
-  records: MaintenanceRecord[],
-  settings: Settings,
-) {
-  const next = nextCalibrationDate(ins, records, settings);
-  if (!next) return null;
-  return daysBetween(next, new Date());
-}
-
-export function healthScore(
-  ins: Instrument,
-  records: MaintenanceRecord[],
-  settings: Settings,
-): number {
-  let score = 100;
-  const insRecords = records.filter((r) => r.instrumentId === ins.id);
-  const cmCount = insRecords.filter((r) => r.type === "CM").length;
-  score -= cmCount * 8;
-
-  const days = daysUntilCalibration(ins, records, settings);
-  if (days !== null) {
-    if (days < 0) score -= Math.min(30, Math.abs(days) / 2);
-    else if (days < 14) score -= 5;
-  }
-
-  const last = insRecords
-    .filter((r) => r.calibrationAfter !== undefined)
-    .sort((a, b) => (a.dateTime < b.dateTime ? 1 : -1))[0];
-  if (last && last.calibrationAfter !== undefined) {
-    if (last.calibrationAfter > settings.calibrationTolerancePct) {
-      score -= 10;
-    }
-  }
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-export function healthBand(
-  score: number,
-  settings: Settings,
-): "Excellent" | "Fair" | "Poor" {
-  if (score >= settings.healthExcellentMin) return "Excellent";
-  if (score >= settings.healthFairMin) return "Fair";
-  return "Poor";
+export interface DashboardFilters {
+  area?: string;
+  equipmentType?: string;
 }
 
 export interface DashboardKPIs {
   totalInstruments: number;
-  availability: number | null;
-  mtbfDays: number | null;
-  mttrHours: number | null;
-  overdueCalibrations: number;
-  pmRatio: number | null;
-  cmRatio: number | null;
-  hasData: boolean;
+  progressThisMonthPct: number | null;   // Finish/planned this month
+  finishedThisMonth: number;
+  overdueCount: number;                  // running Behind backlog
 }
 
 export function computeKPIs(
   instruments: Instrument[],
-  maintenance: MaintenanceRecord[],
-  settings: Settings,
-  filters?: { from?: Date; to?: Date; unit?: string; criticality?: string },
+  tasks: PmTaskRecord[],
+  _settings: Settings,
+  f: DashboardFilters = {},
 ): DashboardKPIs {
-  const filteredInstruments = instruments.filter(
-    (i) =>
-      (!filters?.unit || i.location === filters.unit) &&
-      (!filters?.criticality || i.criticality === filters.criticality),
-  );
-  const insIds = new Set(filteredInstruments.map((i) => i.id));
-  const inRange = (r: MaintenanceRecord) => {
-    const d = new Date(r.dateTime);
-    if (filters?.from && d < filters.from) return false;
-    if (filters?.to && d > filters.to) return false;
-    return insIds.has(r.instrumentId);
-  };
-  const recs = maintenance.filter(inRange);
-  const cm = recs.filter((r) => r.type === "CM");
-  const pm = recs.filter((r) => r.type === "PM");
+  const instFilter = (i: Instrument) =>
+    (!f.area || i.area === f.area) && (!f.equipmentType || i.equipmentType === f.equipmentType);
+  const taskFilter = (t: PmTaskRecord) =>
+    (!f.area || t.area === f.area) && (!f.equipmentType || t.equipmentType === f.equipmentType);
 
-  const hasInstruments = filteredInstruments.length > 0;
-  const totalHours = hasInstruments ? 24 * 30 * filteredInstruments.length : 0;
-  const totalDowntime = recs.reduce((s, r) => s + (r.downtimeHours ?? 0), 0);
-  const availability =
-    totalHours > 0
-      ? +(((totalHours - totalDowntime) / totalHours) * 100).toFixed(2)
-      : null;
+  const fi = instruments.filter(instFilter);
+  const ft = tasks.filter(taskFilter);
 
-  const mtbfDays =
-    cm.length > 0
-      ? Math.round((filteredInstruments.length * 30) / cm.length)
-      : hasInstruments
-        ? filteredInstruments.length * 30
-        : null;
-  const totalRepair = cm.reduce((s, r) => s + (r.repairTimeHours ?? 0), 0);
-  const mttrHours = cm.length > 0 ? +(totalRepair / cm.length).toFixed(2) : null;
+  const now = new Date();
+  const thisMonthPlanned = ft.filter((t) => isSameMonth(t.planDate, now));
+  const thisMonthFinish = thisMonthPlanned.filter((t) => t.status === "Finish");
+  const progress = thisMonthPlanned.length
+    ? Math.round((thisMonthFinish.length / thisMonthPlanned.length) * 100)
+    : null;
 
-  const overdue = filteredInstruments.filter((i) =>
-    isOverdue(i, maintenance, settings),
-  ).length;
-
-  const total = pm.length + cm.length;
   return {
-    totalInstruments: filteredInstruments.length,
-    availability,
-    mtbfDays,
-    mttrHours,
-    overdueCalibrations: overdue,
-    pmRatio: total ? Math.round((pm.length / total) * 100) : null,
-    cmRatio: total ? Math.round((cm.length / total) * 100) : null,
-    hasData: recs.length > 0 || hasInstruments,
+    totalInstruments: fi.length,
+    progressThisMonthPct: progress,
+    finishedThisMonth: thisMonthFinish.length,
+    overdueCount: ft.filter((t) => t.status === "Behind").length,
   };
 }
+
+export interface AreaProgress { area: string; total: number; finish: number; pct: number; }
+
+export function progressByArea(tasks: PmTaskRecord[], f: DashboardFilters = {}): AreaProgress[] {
+  const filtered = tasks.filter((t) => !f.equipmentType || t.equipmentType === f.equipmentType);
+  const groups = new Map<string, { total: number; finish: number }>();
+  for (const t of filtered) {
+    const g = groups.get(t.area) ?? { total: 0, finish: 0 };
+    g.total++;
+    if (t.status === "Finish") g.finish++;
+    groups.set(t.area, g);
+  }
+  return Array.from(groups, ([area, v]) => ({
+    area,
+    ...v,
+    pct: v.total ? Math.round((v.finish / v.total) * 100) : 0,
+  })).sort((a, b) => a.area.localeCompare(b.area));
+}
+
+export function equipmentDistribution(instruments: Instrument[], f: DashboardFilters = {}) {
+  const list = instruments.filter((i) => !f.area || i.area === f.area);
+  const map = new Map<string, number>();
+  for (const i of list) map.set(i.equipmentType, (map.get(i.equipmentType) ?? 0) + 1);
+  return Array.from(map, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+}
+
+/** Upcoming (within N days) + overdue tasks, soonest / most-overdue first. */
+export function dueSoonList(
+  tasks: PmTaskRecord[],
+  settings: Settings,
+  f: DashboardFilters = {},
+): PmTaskRecord[] {
+  const today = startOfDay(new Date());
+  const horizon = new Date(today);
+  horizon.setDate(horizon.getDate() + settings.upcomingWindowDays);
+  return tasks
+    .filter((t) => (!f.area || t.area === f.area) && (!f.equipmentType || t.equipmentType === f.equipmentType))
+    .filter((t) => {
+      if (t.actualDate) return false;
+      const plan = startOfDay(new Date(t.planDate));
+      return plan.getTime() <= horizon.getTime();
+    })
+    .sort((a, b) => (a.planDate < b.planDate ? -1 : 1));
+}
+
+/** For PM Status page — latest task per instrument. */
+export function latestTaskByInstrument(tasks: PmTaskRecord[]): Map<string, PmTaskRecord> {
+  const map = new Map<string, PmTaskRecord>();
+  for (const t of tasks) {
+    const existing = map.get(t.instrumentId);
+    if (!existing || t.planDate > existing.planDate) map.set(t.instrumentId, t);
+  }
+  return map;
+}
+
+export const STATUS_COLORS: Record<TaskStatus, string> = {
+  Finish: "var(--success)",
+  Inprogress: "var(--warning)",
+  Behind: "var(--primary)",
+  Scheduled: "var(--muted-foreground)",
+};

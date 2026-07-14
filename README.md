@@ -1,244 +1,154 @@
-# Pertamina Reliability Instrumentation
+# Pertamina Reliability Instrumentation Dashboard
 
-Preventive Maintenance (PM) and Corrective Maintenance (CM) tracking for instruments in **Maintenance Area 2, PT Kilang Pertamina Internasional RU VI Balongan**.
+A PM & PdM tracking dashboard for **Maintenance Area 2, PT Kilang Pertamina Internasional RU VI Balongan**. Built for reliability engineers who need to see, at a glance, which preventive/predictive maintenance tasks are done, in-progress, or behind — per Area and per Equipment type — grounded in the real spreadsheet layout the team already uses.
 
-Modern, browser-based dashboard built with React + TanStack Start, deployable to **Cloudflare Workers** with **D1** as the database.
+## Stack
 
----
+- **TanStack Start v1** (React 19 + Vite 7), file-based routing under `src/routes/`.
+- **Tailwind CSS v4** with a "liquid glass" design system in `src/styles.css`.
+- **Zustand** for client state (persisted to `localStorage` today; D1 wiring described below).
+- **Cloudflare Workers** deploy target (`wrangler.toml`, entry `src/server.ts`).
+- **D1** schema in `migrations/` — production data source once wired.
 
-## a. Project Overview
-
-Helps maintenance & reliability engineers in Area 2 track instrument health, calibration schedules, PM/CM history, and reliability KPIs (Availability, MTBF, MTTR) — replacing scattered Word/Excel logs with a live dashboard. Multi-user with authentication so different engineers share the same data.
-
-## b. Feature List
-
-**Pages**
-- **Login** (`/auth`) — clean, on-brand sign-in. On a fresh install, the first person prompted to create the initial **Admin** account (bootstrap).
-- **Dashboard Overview** — KPIs, PM vs CM donut, per-unit bar chart, health distribution, monthly trend, unit/criticality filters. Red is reserved for genuinely critical states.
-- **Instruments** — searchable/filterable table + detail drawer with history and next calibration.
-- **Maintenance History** — full PM/CM log with filters and CSV export.
-- **Health & Calibration** — traffic-light grid; overdue / due-soon warnings.
-- **Notifications & Escalation** — active alerts + editable escalation matrix.
-- **Input Data** — Manual Entry (2-step wizard) + **Smart Import** (see below).
-- **Settings** — tabbed: Health Scoring, PM & Calibration Intervals, Escalation Matrix, Backup & Reset.
-- **Help & Guide** (`/help`) — built-in user guide with **live English / Indonesian language switch** and a persisted preference.
-- **User Management** (`/admin/users`, hidden) — reachable only from the Admin profile dropdown, not the sidebar.
-
-**Empty states.** Ships with no seed data — every page renders a tidy empty state with a clear next action.
-
-**KPI formulas (plain language)**
-- **Availability** = (operating hours − downtime hours) ÷ operating hours × 100
-- **MTBF** = total operating days ÷ number of CM events
-- **MTTR** = total repair hours ÷ number of CM events
-- **PM/CM Ratio** = PM count ÷ total (and CM count ÷ total)
-- **Health Score** starts at 100, −8 per CM, up to −30 for overdue calibration (proportional to days overdue), −5 if due within 14 days, −10 if last calibration deviation exceeds tolerance. Bands: ≥90 Excellent, ≥70 Fair, <70 Poor.
-
-## Roles & Permissions
-
-Exactly two roles: **Admin** and **User**.
-
-| Capability | Admin | User |
-|---|---|---|
-| Dashboard, Instruments, Maintenance, Health, Notifications | ✅ | ✅ |
-| Input Data (manual + Smart Import) | ✅ | ✅ |
-| Help & Guide (with EN/ID switch) | ✅ | ✅ |
-| Settings → Health Scoring, PM/Calibration Intervals, Escalation | ✅ (edit) | ✅ (edit) |
-| Settings → **Backup & Reset** (Export / Import / Reset) | ✅ | ❌ disabled with "Admin only" |
-| User Management (`/admin/users`, profile menu entry) | ✅ | ❌ hidden + route redirect |
-
-Non-Admins who try `/admin/users` directly are redirected to the Dashboard with no flash of admin content.
-
-## c. Tech Stack
-
-- **React 19 + Vite 7 + TanStack Start** (file-based routing, SSR-ready)
-- **TanStack Query** — data cache
-- **Tailwind CSS v4** — design tokens in `src/styles.css`
-- **shadcn/ui + Radix UI** — accessible components
-- **Recharts** — theme-aware charts
-- **Zustand + persist** — client UI state
-- **PapaParse / xlsx / mammoth / sonner** — file parsing + toasts
-- **Cloudflare Workers + D1** — deploy target and database
-
-### Design system
-
-- **Split brand**: the Pertamina icon (PNG with transparent background) is used alone in the header and as favicon. The **"PERTAMINA" wordmark is rendered as real HTML text** in Poppins ExtraBold — no baked-in colors, fully theme-aware, no washed-out logo bug.
-- **Liquid-glass surfaces**: navbar, sidebar, dropdowns, modals, and Settings tabs use frosted-glass backgrounds (`backdrop-filter: blur + saturate`, soft 1px highlight, layered shadows). Automatically flattened when the user has `prefers-reduced-motion` enabled.
-- **Smooth theme transitions**: background / colors ease over 300 ms so light↔dark toggling doesn't hard-cut.
-
-## d. Project / Folder Structure
+## Data model
 
 ```
-migrations/
-└── 0001_init.sql             # D1 schema (users, instruments, maintenance, settings, sessions)
-public/
-└── favicon.png               # Pertamina icon-only mark
-src/
-├── assets/                   # CDN asset pointers (Pertamina icon)
-├── components/
-│   ├── ui/                   # shadcn/ui primitives
-│   ├── layout/AppShell.tsx   # navbar + sidebar + user menu + drawer (liquid glass)
-│   ├── brand.tsx             # split brand: icon + real-text PERTAMINA wordmark
-│   ├── badges.tsx
-│   ├── empty-state.tsx
-│   └── kpi-card.tsx
-├── lib/
-│   ├── auth-store.ts         # session + role (Admin/User) + password hashing
-│   ├── smart-import.ts       # fuzzy header mapping + auto record-type detection
-│   ├── types.ts
-│   ├── store.ts
-│   ├── seed.ts               # empty seed + default Settings
-│   ├── kpi.ts
-│   ├── theme.tsx             # theme provider + blocking init script (no flicker)
-│   └── utils.ts
-├── routes/
-│   ├── __root.tsx            # Providers, meta, favicon, theme init script, auth gate
-│   ├── auth.tsx              # Login + first-admin bootstrap
-│   ├── index.tsx             # Dashboard
-│   ├── instruments.tsx
-│   ├── maintenance.tsx
-│   ├── health.tsx
-│   ├── notifications.tsx
-│   ├── input.tsx             # Manual + Smart Import
-│   ├── help.tsx              # Bilingual EN/ID Help & Guide
-│   ├── settings.tsx          # Tabs: Health / Intervals / Escalation / Backup & Reset
-│   └── admin.users.tsx       # HIDDEN — /admin/users, Admin only
-├── server.ts                 # Worker fetch entry
-└── styles.css                # Tailwind + tokens (light/dark) + liquid-glass utilities
-wrangler.toml                 # Cloudflare Worker + D1 binding
+Instrument
+  tagNumber (unique)     e.g. "12-JS-007"
+  area                    "12" | "14" | "22" | "AHU" | "HTU" | "DHC" | ...
+  equipmentType           "Junction Box" | "Control Valve" | "Transmitter" | ...
+  lokasi (optional)       descriptive location
+  pmFrequency             { count, unit: minggu|bulan|tahun }
+  createdBy, createdAt
+
+PmTaskRecord
+  tagNumber, area, equipmentType   (from instrument)
+  period (optional)                  W1..W4
+  planDate, actualDate               ISO date
+  pic                                person in charge
+  activity, activityType             activityType: PM | PdM | Perbaikan
+  kendala, perbaikanLanjutan, catatan
+  status                              Finish | Inprogress | Behind | Scheduled
+  createdBy, createdAt
 ```
 
-## e. Data Model
+Fields intentionally **removed** from earlier revisions: `criticality`, `runningHours`, health-score, calibration tolerance / before / after, failure mode, repair time, downtime, MTBF, MTTR, Availability. None of them exist in the real team files.
 
-**users** (D1) — `id`, `name`, `email` (unique), `password_hash`, `salt`, `role` ∈ {`Admin`, `User`}, `active`, `created_at`. Password is SHA-256 over `salt:password`.
+## Pages
 
-**instruments** — tag, name, location, type, criticality (High/Medium/Low/SCE), commissioning date, running hours.
-**maintenance_records** — instrument FK, dateTime, type (PM/CM), activity, final status, failure mode, repair/downtime hours, calibration before/after, technician, notes.
-**settings** — single row; JSON columns for instrument types and interval rules, plus scalar thresholds.
-**escalation_rules** — recipients per criticality.
-**sessions** — server-side revocable session records.
+- **Dashboard** — Total Instrument, Progress PM Bulan Ini %, Pekerjaan Selesai, Pekerjaan Overdue, Progress per Area (bar), Distribusi Jenis Instrument (donut), Daftar Pekerjaan Akan Jatuh Tempo (upcoming/overdue table). Filters: Area, Equipment Type.
+- **Instruments** — master list with delete (cascades related PM tasks after a confirm-with-count dialog).
+- **Maintenance History** — new columns (Tag, Area, Equipment, Period, Plan, Actual, PIC, Activity, Type, Status, Kendala, Perbaikan Lanjutan, Catatan). Filters + CSV export + per-row delete.
+- **PM Status** (was "Health & Calibration") — traffic-light card per instrument based on its latest task: green=Finish, yellow=Inprogress, red=Behind, grey=Scheduled.
+- **Notifications** — every task currently `Behind`, grouped by Area, with escalation recipients configured per Area.
+- **Input Data** — manual Instrument form, manual PM Task form, Smart Import.
+- **Settings** — Areas & Equipment lists, PM Frequency per equipment type, Escalation per Area, Dashboard upcoming-window, Backup & Reset (Admin-only).
+- **Help & Guide** — bilingual (English / Bahasa Indonesia), toggle persists.
+- **Auth** — one-time Admin bootstrap (based on `users.length === 0`, not a resettable flag), regular sign-in, and a public `/register` page for self-registration.
+- **Admin → User Management** — Users, Pending Requests (approve/reject), Sessions (view + revoke).
 
-## f. How Data Flows
+## Status derivation
 
-1. **Auth** — client-side auth store today; will move to D1-backed server functions with signed-cookie sessions once wired.
-2. **First-admin bootstrap** — on an empty install, `/auth` shows a one-time "Create Admin" form.
-3. **Client → Server → D1** (target) — pages read via TanStack Query; server functions in `src/lib/*.functions.ts` query D1 via the `DB` binding.
-4. **Backup / restore** — Settings → Backup & Reset (Admin only).
+- `actualDate` filled → **Finish**
+- No `actualDate`, `planDate` in the past → **Behind**
+- Manually flagged → **Inprogress**
+- Otherwise → **Scheduled**
+
+Auto-recomputed on every task change and on store rehydrate.
+
+## Registration & approval (no email / OTP)
+
+Self-registration creates a `status = pending`, `role = User`, `active = false` account. An Admin approves or rejects it from **User Management → Pending Requests**. Login of a pending account shows "awaiting Admin approval"; rejected accounts see "not approved, contact your Admin". No email verification is needed for this round — it's a pure Admin approval flow.
+
+## Security posture (what's implemented vs. what needs a live deploy)
+
+Implemented in this round:
+- PBKDF2-SHA256 (120,000 iterations, per-user random salt) password hashing — replaces the earlier single-round SHA-256.
+- Session records with login/last-active timestamps and Admin revoke.
+- No password hashes ever leave the store; the login flow compares hashes only.
+- Migration schema for a `users.status` column and a dedicated `sessions` table.
+
+Structurally scaffolded, activates once you deploy with D1:
+- Move credential verification server-side (`src/routes/api/auth/*`) hitting D1 via the `DB` binding, so the client only ever POSTs email+password and receives an HttpOnly Secure SameSite=Strict session cookie.
+- Rate-limit login and register endpoints (requires a KV or Durable Object binding — D1 alone is a poor fit for counters).
+- CSP / X-Frame-Options / X-Content-Type-Options headers via `wrangler.toml` or in `src/server.ts`.
+- Parameterized SQL everywhere (D1 uses `?` placeholders; there is no string concatenation in the migration or planned handlers).
+
+## Liquid glass — where to see it
+
+After this round the following surfaces have visible frosted-glass treatment (backdrop blur, translucent tint, top highlight, layered shadow):
+
+- Top navbar (scroll page content behind it to see the blur).
+- Sidebar (both desktop and mobile drawer).
+- All main-content Cards (`glass-panel` class).
+- Popovers, dropdowns, dialogs, sheets, tabs list.
+- Auth and Register cards.
+
+Motion:
+- Dropdown/dialog open uses a spring easing (`cubic-bezier(0.16,1,0.3,1)`).
+- Cards lift on hover (`hover:-translate-y-0.5 hover:shadow-lg`).
+- Theme toggle crossfade on `body` (`transition: background-color 320ms ease`).
+- Respects `prefers-reduced-motion` — disables blur and transitions.
 
 ## Smart Import
 
-Import from CSV, XLSX, or DOCX **without** matching a template:
-
-- **Fuzzy column detection** — aliases like *Tag / Tag Number / Asset Tag / Instrument Tag* all map to `tagNumber`; *Location / Unit / Area* map to `location`; PM/CM columns accept *"Preventive" / "Corrective"*, and so on. Matching is case- and punctuation-insensitive.
-- **Automatic record-type detection** — files are classified as either **Instrument master data** or **Maintenance records** based on which fields are present. You can override the guess.
-- **Mapping confirmation step** — after auto-detection you see a table of *file column → system field* with dropdowns to correct any mismatch or mark a column *Ignore*.
-- **Forgiving validation** — only truly required fields (tag + name for instruments; tag + date + PM/CM type for maintenance) can invalidate a row. Extra/unknown columns are ignored, not rejected.
-- **DOCX tables** get the same fuzzy logic as spreadsheets.
-- (Optional stretch — not yet wired) Cloudflare Workers AI could be used as a low-confidence fallback for ambiguous headers; the heuristic works standalone.
-
-The template CSV is still downloadable from the Smart Import panel for anyone who wants a guaranteed layout.
-
-## g. Installation & Running Locally
-
-Prerequisites: Node.js 20+, npm 10+ (Ubuntu bash and Windows both work).
-
-```bash
-npm install
-npm run dev      # http://localhost:8080
-npm run build
-npm run preview
-```
-
-For local D1 development:
-
-```bash
-wrangler d1 execute reliability-dashboard --local --file=./migrations/0001_init.sql
-wrangler dev
-```
-
-## h. Data Backup & Reset
-
-Settings → **Backup & Reset** (Admin only): Export JSON, Import JSON, Reset. Shows the timestamp of the last local export.
-
-## i. Troubleshooting
-
-- **Locked out on first deploy** — open the deployed URL; if no users exist, `/auth` automatically shows the "Create first Admin" form.
-- **Theme flips on its own** — fixed in v1.2: a blocking `<head>` script now applies the persisted theme before hydration, and no OS `prefers-color-scheme` listener overrides your manual choice.
-- **Charts unreadable in dark mode** — chart colors are wired to CSS variables in `src/styles.css`.
-- **`wrangler d1 execute` says "database not found"** — the `database_id` in `wrangler.toml` was not updated after `wrangler d1 create`.
-
-## j. Customization Notes
-
-- **Icon / favicon** — replace `src/assets/pertamina-icon.png.asset.json` (Lovable CDN pointer) and/or `public/favicon.png`.
-- **Wordmark** — real HTML text in `src/components/brand.tsx`; change the font by editing `--font-brand` in `src/styles.css`.
-- **Brand colors / chart palette** — edit `--primary`, `--info`, `--success`, `--warning`, `--sce`, `--chart-*` in `src/styles.css` (both `:root` and `.dark`).
-- **Liquid-glass strength** — tune `--glass-bg`, `--glass-border`, `--glass-shadow` in `src/styles.css`.
-- **Health thresholds / intervals / escalation** — Settings page in-app.
-
----
+- Accepts CSV and Excel (`.xlsx` / `.xls`).
+- Auto-detects the real header row in the first ~20 rows (real files put report titles at the top).
+- Fuzzy alias matching for the new fields:
+  - `tagNumber` ← Tag Number, Tag. Number, No Tag, Nomor Tag
+  - `lokasi` ← Lokasi, Location
+  - `area` ← Area
+  - `equipmentType` ← Equipment, Jenis, Tipe
+  - `planDate` ← Plan
+  - `actualDate` ← Actual
+  - `pic` ← PIC, Pelaksana
+  - `activity` ← Activity, Aktivitas, Pekerjaan, Job Description, Work Done
+  - `kendala` ← Kendala
+  - `status` ← Status (maps Finish/Selesai, Inprogress/Sedang Dikerjakan, Behind/Terlambat/Overdue)
+  - `perbaikanLanjutan` ← Perbaikan Lanjutan
+  - `catatan` ← Ket, REMARK, Catatan, Notes
+- **Ignores** `No.`, `Evidence`, sign-off/initial columns (`P`, `K`, `MA II`, `WS`, `EIE`, `HSE`, `PE`).
+- Detects and skips non-record sheets (summary/rekap sheets and task-list/checklist templates) with a clear reason.
+- **Two downloadable XLSX templates** on the Input Data page — `Download Instrument Template` and `Download PM Task Template` — with styled headers and greyed example rows that mirror the team's tracker format.
 
 ## Deploying to Cloudflare
 
-### 1. Prerequisites
-
 ```bash
-npm install -g wrangler
+# 1. Install & authenticate
+npm i -g wrangler
 wrangler login
-```
 
-### 2. Create the D1 database
-
-```bash
+# 2. Provision D1
 wrangler d1 create reliability-dashboard
-```
+#   → paste the returned database_id into wrangler.toml
 
-Paste the printed `database_id` into `wrangler.toml`:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "reliability-dashboard"
-database_id = "PASTE_YOUR_ID_HERE"
-migrations_dir = "migrations"
-```
-
-### 3. Run the schema migration
-
-```bash
+# 3. Run migrations
 wrangler d1 execute reliability-dashboard --local  --file=./migrations/0001_init.sql
+wrangler d1 execute reliability-dashboard --local  --file=./migrations/0002_new_model.sql
 wrangler d1 execute reliability-dashboard --remote --file=./migrations/0001_init.sql
-```
+wrangler d1 execute reliability-dashboard --remote --file=./migrations/0002_new_model.sql
 
-### 4. Set secrets
+# 4. Session secret (server-side auth cutover)
+wrangler secret put SESSION_SECRET     # any 32+ char random string
 
-```bash
-wrangler secret put SESSION_SECRET   # value: openssl rand -hex 32
-```
-
-### 5. Deploy
-
-CLI:
-```bash
-npm run build
+# 5. Build & deploy
+bun run build
 wrangler deploy
 ```
 
-Git integration (recommended for ongoing work): connect the repo in **Workers & Pages → Create → Connect to Git**, set build command `npm run build`, framework preset *None*, add the `DB` binding and `SESSION_SECRET` under Settings.
+First-Admin bootstrap: the very first `/auth` visit against a fresh database shows the "Create first Admin" form. Once at least one user exists, that form permanently disappears (it's gated by an actual user-count check, not a flag). Once the server-side auth routes are cut over, the same check runs as `SELECT COUNT(*) FROM users`.
 
-### 6. First run
+## Where to change common things
 
-Open the deployed URL — the login page detects the empty database and shows **"Create first Admin"**. Sign in as Admin, then create additional accounts from the profile menu → **User Management** (or `/admin/users`).
+- **Brand icon** — `src/assets/pertamina-icon.png.asset.json`
+- **Colors / glass tokens** — `src/styles.css` (`:root` and `.dark`)
+- **Default Area / Equipment / PM frequency** — `src/lib/seed.ts`
+- **Upcoming-window default** — `src/lib/seed.ts` (`upcomingWindowDays: 14`)
+- **Status derivation** — `src/lib/kpi.ts` (`deriveStatus`)
+- **KPI computations** — `src/lib/kpi.ts` (`computeKPIs`, `progressByArea`, `dueSoonList`)
+- **Smart Import aliases** — `src/lib/smart-import.ts` (`ALIASES`, `IGNORE_HEADERS`)
+- **Downloadable templates** — `src/lib/templates.ts`
 
-### 7. Verify
+## Round 4 changelog (high level)
 
-- Login page renders; first-Admin bootstrap works on empty install.
-- Dark-mode toggle: icon full-color, "PERTAMINA" wordmark legible, no flashes, theme persists across navigation and reload.
-- Admin: can edit every Settings tab and use Backup & Reset; sees **User Management** in profile menu.
-- User: can edit Health / Intervals / Escalation; Backup & Reset controls are disabled ("Admin only" tooltip); User Management item hidden and route redirects.
-- Smart Import: upload a CSV/XLSX with renamed headers → mapping is auto-guessed and adjustable.
-- `wrangler.toml` and `migrations/0001_init.sql` use only the `Admin` / `User` roles — no `Engineer` / `Viewer` leftovers.
-
-### 8. Redeploying
-
-- Git: `git push`.
-- CLI: `npm run build && wrangler deploy`.
-- Schema changes: add `migrations/000N_*.sql` and rerun the `wrangler d1 execute … --remote` step.
+Data model rewrite; new dashboard KPIs; PM Status page (renamed from Health & Calibration); status derivation logic; Settings overhaul (Areas / Equipment / PM Frequency / Escalation-per-Area); registration + approval flow; PBKDF2 password hashing; session records + Admin revoke; `createdBy` audit field on Instruments and PM Tasks; delete for instruments (cascade) and tasks; bilingual Help & Guide rewrite in natural Bahasa Indonesia; Smart Import alias rework + two XLSX templates; visible liquid-glass pass with real backdrop blur, translucent tints, top highlights, layered shadows, spring motion, hover lift, theme crossfade; logo/wordmark vertical alignment fix.
