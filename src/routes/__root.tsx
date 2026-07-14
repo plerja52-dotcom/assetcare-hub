@@ -80,10 +80,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Pertamina Reliability Instrumentation" },
       {
         property: "og:description",
-        content: "PM/CM analytics and instrument management for Area 2, RU VI Balongan.",
+        content: "Preventive and Corrective Maintenance dashboard for instruments in Maintenance Area 2, PT Kilang Pertamina Internasional RU VI Balongan.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Pertamina Reliability Instrumentation" },
+      { name: "twitter:description", content: "Preventive and Corrective Maintenance dashboard for instruments in Maintenance Area 2, PT Kilang Pertamina Internasional RU VI Balongan." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fcb2e808-d63e-4f80-ae11-bfa7a208d39d/id-preview-73ec13a3--814a8418-6953-48b0-a0d6-8ad8bca574ac.lovable.app-1783990514602.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fcb2e808-d63e-4f80-ae11-bfa7a208d39d/id-preview-73ec13a3--814a8418-6953-48b0-a0d6-8ad8bca574ac.lovable.app-1783990514602.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
