@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as InstrumentsRouteImport } from './routes/instruments'
@@ -23,6 +24,11 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotificationsRoute = NotificationsRouteImport.update({
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
 }
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
 }
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/instruments': typeof InstrumentsRoute
   '/maintenance': typeof MaintenanceRoute
   '/notifications': typeof NotificationsRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
 }
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/instruments'
     | '/maintenance'
     | '/notifications'
+    | '/register'
     | '/settings'
     | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/instruments'
     | '/maintenance'
     | '/notifications'
+    | '/register'
     | '/settings'
     | '/admin/users'
   id:
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/instruments'
     | '/maintenance'
     | '/notifications'
+    | '/register'
     | '/settings'
     | '/admin/users'
   fileRoutesById: FileRoutesById
@@ -156,6 +168,7 @@ export interface RootRouteChildren {
   InstrumentsRoute: typeof InstrumentsRoute
   MaintenanceRoute: typeof MaintenanceRoute
   NotificationsRoute: typeof NotificationsRoute
+  RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
 }
@@ -167,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notifications': {
@@ -244,6 +264,7 @@ const rootRouteChildren: RootRouteChildren = {
   InstrumentsRoute: InstrumentsRoute,
   MaintenanceRoute: MaintenanceRoute,
   NotificationsRoute: NotificationsRoute,
+  RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
 }

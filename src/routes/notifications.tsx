@@ -1,98 +1,108 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/kpi-card";
 import { useAppStore } from "@/lib/store";
+import { AreaBadge } from "@/components/badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CriticalityBadge } from "@/components/badges";
-import { daysUntilCalibration, healthScore, isOverdue } from "@/lib/kpi";
-import { AlertTriangle, ShieldAlert, Bell } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/empty-state";
+import { AlertTriangle, Bell, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
+import { daysBetween } from "@/lib/kpi";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/notifications")({
+  head: () => ({ meta: [{ title: "Notifications — Pertamina Reliability Instrumentation" }] }),
   component: NotificationsPage,
 });
 
 function NotificationsPage() {
-  const { instruments, maintenance, settings, updateSettings } = useAppStore();
+  const { tasks, settings } = useAppStore();
 
-  const alerts = instruments
-    .map((i) => {
-      const overdue = isOverdue(i, maintenance, settings);
-      const days = daysUntilCalibration(i, maintenance, settings);
-      const score = healthScore(i, maintenance, settings);
-      const criticalSCE = i.criticality === "SCE" && (overdue || score < settings.healthFairMin);
-      const highUrgency = i.criticality === "High" && overdue;
-      return { i, overdue, days, score, critical: criticalSCE || highUrgency };
-    })
-    .filter((a) => a.overdue || a.critical)
-    .sort((a, b) => Number(b.critical) - Number(a.critical));
+  const overdue = useMemo(
+    () => tasks.filter((t) => t.status === "Behind")
+      .sort((a, b) => (a.planDate < b.planDate ? -1 : 1)),
+    [tasks],
+  );
+
+  const byArea = useMemo(() => {
+    const map = new Map<string, typeof overdue>();
+    for (const t of overdue) {
+      const arr = map.get(t.area) ?? [];
+      arr.push(t); map.set(t.area, arr);
+    }
+    return Array.from(map, ([area, items]) => ({ area, items })).sort((a,b) => a.area.localeCompare(b.area));
+  }, [overdue]);
+
+  const recipientsFor = (area: string) =>
+    settings.escalation.find((e) => e.area === area)?.recipients ?? "";
 
   return (
     <AppShell>
       <PageHeader
-        title="Notifications & Escalation"
-        description="Active alerts based on criticality and calibration status."
+        title="Notifications"
+        description="Every task currently overdue (Behind), grouped by Area with its escalation recipients."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-3">
-          {alerts.map(({ i, overdue, days, score, critical }) => (
-            <Card key={i.id} className={critical ? "border-primary/40" : ""}>
-              <CardContent className="p-4 flex items-start gap-4">
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${critical ? "bg-primary/10 text-primary" : "bg-warning/20 text-warning-foreground dark:text-warning"}`}>
-                  {critical ? <ShieldAlert className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{i.tagNumber}</span>
-                    <CriticalityBadge value={i.criticality} />
-                    <span className="text-xs text-muted-foreground">· {i.location}</span>
-                  </div>
-                  <div className="text-sm mt-1">
-                    {critical && <span className="font-medium text-primary">High Urgency: </span>}
-                    {overdue
-                      ? `Calibration overdue by ${Math.abs(days ?? 0)} days.`
-                      : `Health score ${score} below threshold.`}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Notify: {settings.escalation.find((e) => e.criticality === i.criticality)?.recipients}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {alerts.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">
-              <Bell className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              No active alerts. All instruments within thresholds.
-            </CardContent></Card>
-          )}
-        </div>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Escalation Matrix</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {settings.escalation.map((rule, idx) => (
-              <div key={rule.criticality} className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <CriticalityBadge value={rule.criticality} />
-                </div>
-                <Input
-                  value={rule.recipients}
-                  onChange={(e) => {
-                    const next = [...settings.escalation];
-                    next[idx] = { ...rule, recipients: e.target.value };
-                    updateSettings({ escalation: next });
-                  }}
-                  onBlur={() => toast.success("Escalation updated")}
-                  placeholder="email1, email2"
-                />
-              </div>
-            ))}
+      {overdue.length === 0 ? (
+        <Card className="glass-panel border-0">
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Bell}
+              title="No overdue tasks"
+              description="Every planned PM task is on time. Notifications trigger when a task's plan date passes without an actual date recorded."
+              action={<Button asChild variant="outline"><Link to="/input"><Plus className="h-4 w-4 mr-1" />Log Task</Link></Button>}
+            />
           </CardContent>
         </Card>
-      </div>
+      ) : (
+        <div className="space-y-4">
+          {byArea.map(({ area, items }) => {
+            const recipients = recipientsFor(area);
+            return (
+              <Card key={area} className="glass-panel border-0">
+                <CardHeader className="flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">Area <AreaBadge value={area} /> · {items.length} overdue</CardTitle>
+                  </div>
+                  <Button
+                    size="sm" variant="outline"
+                    disabled={!recipients}
+                    onClick={() => toast.success(`Notification queued to ${recipients}`)}
+                  >
+                    {recipients ? "Send escalation" : "No recipients set"}
+                  </Button>
+                </CardHeader>
+                <CardContent className="text-xs text-muted-foreground">
+                  <div className="mb-2">
+                    Recipients:{" "}
+                    <span className="text-foreground">
+                      {recipients || <Link to="/settings" className="underline">configure in Settings</Link>}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-border/60">
+                    {items.map((t) => {
+                      const dayLate = -daysBetween(new Date(t.planDate), new Date());
+                      return (
+                        <li key={t.id} className="py-2 grid grid-cols-[1fr_auto] items-center gap-3">
+                          <div className="min-w-0">
+                            <div className="font-mono text-xs text-foreground">{t.tagNumber} · {t.equipmentType}</div>
+                            <div className="truncate">{t.activity || "—"} · plan {t.planDate}</div>
+                          </div>
+                          <div className="text-primary font-semibold text-xs whitespace-nowrap">
+                            {dayLate} day{dayLate === 1 ? "" : "s"} late
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </AppShell>
   );
 }
