@@ -126,19 +126,21 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+const PUBLIC_ROUTES = new Set(["/auth", "/register"]);
+
 function AuthGate({ children }: { children: ReactNode }) {
   const currentUserId = useAuthStore((s) => s.currentUserId);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const isAuthRoute = pathname === "/auth";
+  const isPublic = PUBLIC_ROUTES.has(pathname);
 
   useEffect(() => {
-    if (!currentUserId && !isAuthRoute) {
+    if (!currentUserId && !isPublic) {
       navigate({ to: "/auth", replace: true });
     }
-  }, [currentUserId, isAuthRoute, navigate]);
+  }, [currentUserId, isPublic, navigate]);
 
-  if (!currentUserId && !isAuthRoute) return null;
+  if (!currentUserId && !isPublic) return null;
   return <>{children}</>;
 }
 
