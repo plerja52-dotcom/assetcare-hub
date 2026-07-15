@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import {
+  deriveSessionStatus,
   hashPassword, randomSalt, useAuthStore, useIsAdmin, type Role, type StoredUser,
 } from "@/lib/auth-store";
 import { toast } from "sonner";
@@ -49,6 +50,7 @@ function AdminUsersPage() {
 
   const pending = users.filter((u) => u.status === "pending");
   const active = users.filter((u) => u.status !== "pending");
+  const activeSessionsCount = sessions.filter((s) => deriveSessionStatus(s) === "Active").length;
 
   return (
     <AppShell>
@@ -59,7 +61,7 @@ function AdminUsersPage() {
           <TabsTrigger value="pending">Pending Requests
             {pending.length > 0 && <Badge className="ml-1.5 bg-primary text-primary-foreground">{pending.length}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="sessions">Sessions <Badge variant="secondary" className="ml-1.5">{sessions.filter(s => !s.revoked).length}</Badge></TabsTrigger>
+          <TabsTrigger value="sessions">Sessions <Badge variant="secondary" className="ml-1.5">{activeSessionsCount}</Badge></TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -79,6 +81,7 @@ function AdminUsersPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Username</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Requested</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -88,6 +91,7 @@ function AdminUsersPage() {
                     {pending.map((u) => (
                       <TableRow key={u.id}>
                         <TableCell className="font-medium">{u.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{u.username}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {u.createdAt ? new Date(u.createdAt).toLocaleString() : "—"}
@@ -126,28 +130,31 @@ function AdminUsersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sessions.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">{s.userName}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {new Date(s.loginAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {new Date(s.lastActiveAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          {s.revoked
-                            ? <Badge variant="outline" className="text-primary border-primary/40">Revoked</Badge>
-                            : <Badge variant="outline" className="text-success border-success/40">Active</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant="outline" disabled={s.revoked}
-                            onClick={() => { revokeSession(s.id); toast.success("Session revoked"); }}>
-                            <X className="h-4 w-4 mr-1" />Revoke
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {sessions.map((s) => {
+                      const status = deriveSessionStatus(s);
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{s.userName}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(s.loginAt).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(s.lastActiveAt).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            {status === "Active" && <Badge variant="outline" className="text-success border-success/40">Active</Badge>}
+                            {status === "Expired" && <Badge variant="outline" className="text-muted-foreground border-border">Expired</Badge>}
+                            {status === "Revoked" && <Badge variant="outline" className="text-primary border-primary/40">Revoked</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" disabled={status !== "Active"}
+                              onClick={() => { revokeSession(s.id); toast.success("Session revoked"); }}>
+                              <X className="h-4 w-4 mr-1" />Revoke
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -176,6 +183,7 @@ function UsersTable({ users, updateUser, removeUser }: {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Active</TableHead>
@@ -186,6 +194,7 @@ function UsersTable({ users, updateUser, removeUser }: {
                 {users.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{u.username}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                     <TableCell>
                       <Select value={u.role} onValueChange={(v) => updateUser(u.id, { role: v as Role })}>
@@ -242,6 +251,7 @@ function NewUserCard({ addUser, existing }: {
   existing: StoredUser[];
 }) {
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("User");
@@ -249,19 +259,21 @@ function NewUserCard({ addUser, existing }: {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name || !email || password.length < 8) { toast.error("Fill in all fields (min 8-char password)"); return; }
+    if (!name || !username || !email || password.length < 8) { toast.error("Fill in all fields (min 8-char password)"); return; }
+    const uname = username.trim().toLowerCase();
     if (existing.some((u) => u.email.toLowerCase() === email.toLowerCase())) { toast.error("Email already exists"); return; }
+    if (existing.some((u) => u.username.toLowerCase() === uname)) { toast.error("Username already exists"); return; }
     setBusy(true);
     try {
       const salt = randomSalt();
       const passwordHash = await hashPassword(password, salt);
       addUser({
-        id: crypto.randomUUID(), name, email, role,
+        id: crypto.randomUUID(), name, username: uname, email, role,
         active: true, status: "approved",
         salt, passwordHash, createdAt: new Date().toISOString(),
       });
       toast.success(`${name} added`);
-      setName(""); setEmail(""); setPassword("");
+      setName(""); setUsername(""); setEmail(""); setPassword("");
     } finally { setBusy(false); }
   }
 
@@ -271,6 +283,7 @@ function NewUserCard({ addUser, existing }: {
       <CardContent>
         <form onSubmit={submit} className="space-y-3">
           <div><Label>Full name</Label><Input value={name} onChange={(e) => setName(e.target.value)} required /></div>
+          <div><Label>Username</Label><Input value={username} onChange={(e) => setUsername(e.target.value)} required /></div>
           <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
           <div><Label>Temporary password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></div>
           <div><Label>Role</Label>

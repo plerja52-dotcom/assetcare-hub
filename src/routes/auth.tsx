@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
+  findUserByIdentifier,
   hashPassword, randomSalt, useAuthStore, useNeedsBootstrap,
   type StoredUser,
 } from "@/lib/auth-store";
@@ -20,9 +21,11 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const needsBootstrap = useNeedsBootstrap();
-  const { users, currentUserId, setCurrent, addUser, addSession } = useAuthStore();
+  const { users, currentUserId, addUser, loginSession } = useAuthStore();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState(""); // email OR username
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,11 +35,11 @@ function AuthPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!email || !password) { setError("Please enter both email and password."); return; }
+    if (!identifier || !password) { setError("Please enter your email/username and password."); return; }
     setBusy(true);
     try {
-      const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-      if (!user) { setError("Invalid email or password."); return; }
+      const user = findUserByIdentifier(users, identifier);
+      if (!user) { setError("Invalid credentials."); return; }
       if (user.status === "pending") {
         setError("Your account is awaiting Admin approval."); return;
       }
@@ -44,13 +47,8 @@ function AuthPage() {
         setError("Your account request was not approved. Contact your Admin."); return;
       }
       const attempt = await hashPassword(password, user.salt);
-      if (attempt !== user.passwordHash) { setError("Invalid email or password."); return; }
-      setCurrent(user.id);
-      addSession({
-        id: crypto.randomUUID(),
-        userId: user.id, userName: user.name,
-        loginAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(),
-      });
+      if (attempt !== user.passwordHash) { setError("Invalid credentials."); return; }
+      loginSession(user.id, user.name);
       toast.success(`Welcome back, ${user.name}`);
       navigate({ to: "/" });
     } finally { setBusy(false); }
@@ -59,8 +57,8 @@ function AuthPage() {
   async function handleBootstrap(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!name.trim() || !email.trim() || password.length < 8) {
-      setError("Name, email, and a password of at least 8 characters are required."); return;
+    if (!name.trim() || !username.trim() || !email.trim() || password.length < 8) {
+      setError("Name, username, email, and a password of at least 8 characters are required."); return;
     }
     setBusy(true);
     try {
@@ -68,16 +66,14 @@ function AuthPage() {
       const passwordHash = await hashPassword(password, salt);
       const user: StoredUser = {
         id: crypto.randomUUID(),
-        name: name.trim(), email: email.trim(),
+        name: name.trim(),
+        username: username.trim().toLowerCase(),
+        email: email.trim(),
         role: "Admin", active: true, status: "approved",
         salt, passwordHash, createdAt: new Date().toISOString(),
       };
       addUser(user);
-      setCurrent(user.id);
-      addSession({
-        id: crypto.randomUUID(), userId: user.id, userName: user.name,
-        loginAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(),
-      });
+      loginSession(user.id, user.name);
       toast.success("Admin account created");
       navigate({ to: "/" });
     } finally { setBusy(false); }
@@ -85,7 +81,7 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none opacity-[0.10]">
+      <div className="absolute inset-0 pointer-events-none opacity-[0.12]">
         <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-primary blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-info blur-3xl" />
         <div className="absolute top-1/3 left-1/2 h-72 w-72 rounded-full bg-success blur-3xl" />
@@ -111,6 +107,10 @@ function AuthPage() {
                   <Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="username">Username</Label>
+                  <Input id="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
@@ -129,8 +129,15 @@ function AuthPage() {
           ) : (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Label htmlFor="identifier">Email or username</Label>
+                <Input
+                  id="identifier"
+                  autoComplete="username"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="you@example.com or your username"
+                  required
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password">Password</Label>
