@@ -1,71 +1,115 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 /**
- * Builds downloadable XLSX templates that mirror the real Area 2 PM/PdM
- * tracker column layout. Headers are bold, columns are sized, and two
- * greyed-out example rows show the expected shape (marked as EXAMPLE so
- * Smart Import users can delete them before uploading).
+ * Downloadable XLSX templates for Smart Import. Uses ExcelJS so header
+ * formatting, column widths, and frozen panes render correctly in real
+ * Excel/LibreOffice — not just in-browser previewers.
  */
 
-const HEADER_STYLE = {
-  font: { bold: true, color: { rgb: "FFFFFFFF" } },
-  fill: { patternType: "solid", fgColor: { rgb: "FF334155" } },
-  alignment: { vertical: "center", horizontal: "center" },
-};
+async function saveWorkbook(wb: ExcelJS.Workbook, filename: string) {
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
-const EXAMPLE_STYLE = {
-  font: { italic: true, color: { rgb: "FF94A3B8" } },
-  fill: { patternType: "solid", fgColor: { rgb: "FFF1F5F9" } },
-};
+interface Col {
+  header: string;
+  key: string;
+  width: number;
+}
 
-function styledSheet(headers: string[], examples: (string | number)[][], widths: number[]) {
-  const aoa: (string | number)[][] = [headers, ...examples];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = widths.map((w) => ({ wch: w }));
-  // Apply header styles (best-effort; SheetJS community build honors these on export)
-  for (let c = 0; c < headers.length; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c });
-    if (ws[addr]) ws[addr].s = HEADER_STYLE;
+function buildSheet(
+  wb: ExcelJS.Workbook,
+  name: string,
+  cols: Col[],
+  examples: Record<string, string | number>[],
+) {
+  const ws = wb.addWorksheet(name, {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+  ws.columns = cols.map((c) => ({ header: c.header, key: c.key, width: c.width }));
+  const header = ws.getRow(1);
+  header.height = 22;
+  header.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+  header.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+  header.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF334155" } };
+    cell.border = { bottom: { style: "thin", color: { argb: "FF1F2937" } } };
+  });
+  for (const ex of examples) ws.addRow(ex);
+  // Style example rows (italic, muted)
+  for (let i = 0; i < examples.length; i++) {
+    const r = ws.getRow(2 + i);
+    r.font = { italic: true, color: { argb: "FF64748B" } };
+    r.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+    });
   }
-  for (let r = 1; r <= examples.length; r++) {
-    for (let c = 0; c < headers.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (ws[addr]) ws[addr].s = EXAMPLE_STYLE;
-    }
-  }
-  ws["!rows"] = [{ hpt: 22 }];
   return ws;
 }
 
-export function downloadInstrumentTemplate() {
-  const headers = ["No.", "Tag Number", "Lokasi", "Area", "Equipment", "PM Frequency"];
-  const examples = [
-    [1, "12-JS-007", "Reaktor 12 — EXAMPLE (delete before import)", "12", "Junction Box", "1 tahun"],
-    [2, "22-UV-6421", "Line 22 — EXAMPLE (delete before import)", "22", "Transmitter", "1 tahun"],
-  ];
-  const ws = styledSheet(headers, examples, [5, 16, 42, 8, 18, 14]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Instruments");
-  XLSX.writeFile(wb, "instrument-template.xlsx");
+export async function downloadInstrumentTemplate() {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Pertamina Reliability Instrumentation";
+  wb.created = new Date();
+  buildSheet(wb, "Instruments", [
+    { header: "No.", key: "no", width: 6 },
+    { header: "Tag Number", key: "tag", width: 18 },
+    { header: "Lokasi", key: "lokasi", width: 32 },
+    { header: "Area", key: "area", width: 10 },
+    { header: "Unit", key: "unit", width: 12 },
+    { header: "Equipment", key: "equipment", width: 20 },
+    { header: "Sub Type", key: "subType", width: 16 },
+    { header: "PM Frequency", key: "pmFrequency", width: 16 },
+    { header: "Status Instrument", key: "statusInstrument", width: 18 },
+  ], [
+    { no: 1, tag: "12-JS-007", lokasi: "Reaktor 12 — EXAMPLE (delete before import)",
+      area: "12", unit: "Train A", equipment: "Junction Box", subType: "",
+      pmFrequency: "1 tahun", statusInstrument: "Active" },
+    { no: 2, tag: "22-UV-6421", lokasi: "Line 22 — EXAMPLE",
+      area: "22", unit: "", equipment: "Transmitter", subType: "Pressure",
+      pmFrequency: "6 bulan", statusInstrument: "Standby" },
+  ]);
+  await saveWorkbook(wb, "instrument-template.xlsx");
 }
 
-export function downloadPmTaskTemplate() {
-  const headers = [
-    "No.", "Tag Number", "Area", "Equipment", "Period",
-    "Plan", "Actual", "PIC", "Activity", "Activity Type",
-    "Kendala", "Status", "Perbaikan Lanjutan", "Catatan",
-  ];
-  const examples = [
-    [1, "12-JS-007", "12", "Junction Box", "W2",
-     "2026-07-05", "2026-07-07", "Reza — EXAMPLE", "Cleaning & inspection", "PM",
-     "", "Finish", "", "EXAMPLE row — delete before importing"],
-    [2, "22-UV-6421", "22", "Transmitter", "",
-     "2026-07-20", "", "Andi — EXAMPLE", "Loop check", "PdM",
-     "Access blocked", "Behind", "Coordinate with operations", "EXAMPLE row — delete before importing"],
-  ];
-  const ws = styledSheet(headers, examples,
-    [5, 16, 6, 18, 8, 12, 12, 18, 26, 12, 22, 12, 24, 30]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "PM Tasks");
-  XLSX.writeFile(wb, "pm-task-template.xlsx");
+export async function downloadPmTaskTemplate() {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Pertamina Reliability Instrumentation";
+  wb.created = new Date();
+  buildSheet(wb, "PM Tasks", [
+    { header: "No.", key: "no", width: 6 },
+    { header: "Tag Number", key: "tag", width: 18 },
+    { header: "Area", key: "area", width: 8 },
+    { header: "Equipment", key: "equipment", width: 20 },
+    { header: "Period", key: "period", width: 10 },
+    { header: "Plan", key: "plan", width: 14 },
+    { header: "Actual", key: "actual", width: 14 },
+    { header: "PIC", key: "pic", width: 18 },
+    { header: "Activity", key: "activity", width: 28 },
+    { header: "Activity Type", key: "activityType", width: 14 },
+    { header: "Kendala", key: "kendala", width: 22 },
+    { header: "Status", key: "status", width: 12 },
+    { header: "Perbaikan Lanjutan", key: "perbaikanLanjutan", width: 24 },
+    { header: "Catatan", key: "catatan", width: 26 },
+    { header: "Evidence", key: "evidence", width: 22 },
+  ], [
+    { no: 1, tag: "12-JS-007", area: "12", equipment: "Junction Box", period: "W2",
+      plan: "2026-07-05", actual: "2026-07-07", pic: "Reza — EXAMPLE",
+      activity: "Cleaning & inspection", activityType: "PM", kendala: "",
+      status: "Finish", perbaikanLanjutan: "", catatan: "EXAMPLE — delete before importing",
+      evidence: "photo-log-2026-07-07" },
+    { no: 2, tag: "22-UV-6421", area: "22", equipment: "Transmitter", period: "",
+      plan: "2026-07-20", actual: "", pic: "Andi — EXAMPLE",
+      activity: "Loop check", activityType: "PdM", kendala: "Access blocked",
+      status: "Behind", perbaikanLanjutan: "Coordinate with operations",
+      catatan: "EXAMPLE row — delete before importing", evidence: "" },
+  ]);
+  await saveWorkbook(wb, "pm-task-template.xlsx");
 }

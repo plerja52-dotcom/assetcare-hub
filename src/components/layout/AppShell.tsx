@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Wrench,
@@ -35,7 +35,9 @@ const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/instruments", label: "Instruments", icon: Wrench },
   { to: "/maintenance", label: "Maintenance", icon: History },
-  { to: "/health", label: "Health & Calibration", icon: Activity },
+  { to: "/calibration", label: "Calibration", icon: Activity },
+  { to: "/downtime", label: "Downtime", icon: History },
+  { to: "/failures", label: "Failure History", icon: ShieldCheck },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/input", label: "Input Data", icon: FilePlus2 },
   { to: "/help", label: "Help & Guide", icon: HelpCircle },
@@ -88,7 +90,7 @@ function ThemeToggle() {
 function UserMenu() {
   const user = useCurrentUser();
   const navigate = useNavigate();
-  const setCurrent = useAuthStore((s) => s.setCurrent);
+  const signOut = useAuthStore((s) => s.signOut);
   if (!user) return null;
   const initials = user.name
     .split(" ")
@@ -124,8 +126,8 @@ function UserMenu() {
         )}
         <DropdownMenuItem
           onSelect={() => {
-            setCurrent(null);
-            navigate({ to: "/auth" });
+            signOut();
+            navigate({ to: "/auth", replace: true });
           }}
           className="text-primary focus:text-primary"
         >
@@ -139,10 +141,14 @@ function UserMenu() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const touchCurrentSession = useAuthStore((s) => s.touchCurrentSession);
+  useEffect(() => { touchCurrentSession(); }, [pathname, touchCurrentSession]);
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-      {/* Header — liquid glass */}
-      <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/60 glass-surface px-4 md:px-6">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 ambient-bg">
+      {/* Header — liquid glass, floating */}
+      <header className="sticky top-3 z-40 mx-3 md:mx-4 flex h-14 items-center gap-3 rounded-2xl glass-surface px-4 md:px-5">
+
         <Button
           variant="ghost"
           size="icon"
@@ -159,12 +165,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="flex">
-        {/* Sidebar — liquid glass */}
-        <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col border-r border-border/60 glass-sidebar min-h-[calc(100vh-4rem)] sticky top-16">
+      <div className="flex gap-3 md:gap-4 px-3 md:px-4 mt-3">
+        {/* Sidebar — floating glass */}
+        <aside className="hidden md:flex md:w-60 md:shrink-0 md:flex-col rounded-2xl glass-sidebar min-h-[calc(100vh-6rem)] sticky top-20 self-start">
           <NavList />
           <div className="mt-auto p-3 text-[11px] text-muted-foreground">
-            v1.2 · Cloudflare-ready
+            v1.3 · Cloudflare-ready
           </div>
         </aside>
 
@@ -175,8 +181,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
               onClick={() => setDrawer(false)}
             />
-            <div className="absolute left-0 top-0 h-full w-72 glass-sidebar border-r border-border/60 shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
-              <div className="flex items-center justify-between h-16 px-4 border-b border-border/60">
+            <div className="absolute left-0 top-0 h-full w-72 glass-sidebar rounded-r-2xl shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
+              <div className="flex items-center justify-between h-16 px-4 border-b border-border/40">
                 <Brand />
                 <Button
                   variant="ghost"
@@ -192,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 min-w-0 p-4 md:p-8 animate-in fade-in duration-300">
+        <main className="flex-1 min-w-0 p-4 md:p-6 animate-in fade-in duration-300">
           {children}
         </main>
       </div>

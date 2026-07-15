@@ -37,10 +37,10 @@ const ALIASES: Record<FieldKey, string[]> = {
   catatan: ["ket", "remark", "remarks", "catatan", "notes", "comment", "comments"],
 };
 
-// Ignore obvious non-data columns entirely — checklist sign-offs, evidence links,
-// row-index columns.
+// Note: 'evidence' was previously here — removed. Evidence is now a real
+// captured field (see PmTaskRecord.evidence).
 const IGNORE_HEADERS = new Set([
-  "no.", "no", "nomor", "evidence", "photo", "attachment",
+  "no.", "no", "nomor",
   // Single-letter checklist / initials columns
   "p", "k", "ma ii", "ma", "ws", "eie", "hse", "pe",
 ]);

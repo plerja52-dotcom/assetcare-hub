@@ -18,13 +18,13 @@ function RegisterPage() {
   const navigate = useNavigate();
   const { users, addUser } = useAuthStore();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  // If nobody exists yet, first-Admin bootstrap belongs on /auth.
   if (users.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -44,11 +44,15 @@ function RegisterPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!name.trim() || !email.trim() || password.length < 8) {
-      setError("Name, email, and a password of at least 8 characters are required."); return;
+    if (!name.trim() || !username.trim() || !email.trim() || password.length < 8) {
+      setError("Name, username, email, and a password of at least 8 characters are required."); return;
     }
+    const uname = username.trim().toLowerCase();
     if (users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
       setError("An account with this email already exists."); return;
+    }
+    if (users.some((u) => u.username.toLowerCase() === uname)) {
+      setError("That username is already taken."); return;
     }
     setBusy(true);
     try {
@@ -56,7 +60,7 @@ function RegisterPage() {
       const passwordHash = await hashPassword(password, salt);
       const user: StoredUser = {
         id: crypto.randomUUID(),
-        name: name.trim(), email: email.trim(),
+        name: name.trim(), username: uname, email: email.trim(),
         role: "User", active: false, status: "pending",
         salt, passwordHash, createdAt: new Date().toISOString(),
       };
@@ -68,7 +72,7 @@ function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none opacity-[0.10]">
+      <div className="absolute inset-0 pointer-events-none opacity-[0.12]">
         <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-info blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-success blur-3xl" />
       </div>
@@ -101,6 +105,10 @@ function RegisterPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="name">Full name</Label>
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="username">Username</Label>
+                <Input id="username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
