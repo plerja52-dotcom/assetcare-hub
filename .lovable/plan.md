@@ -1,64 +1,63 @@
-# Reliability Dashboard — Round 4 Plan
 
-You've asked for 18 interlocking sections in a single round, and you've said this is your one shot for a while. Before I spend the round, I need to be straight with you about what's realistic in one turn vs. what I'll have to make judgment calls on, so you're not surprised by the result.
+This round is large. I'll implement it in the order you specified and validate Part A visually before moving on. Here's what I'll build and the judgment calls I'll make.
 
-## The honest scope reality
+## Part A — Bug fixes (do first, verify by driving the preview)
 
-Sections 3 (new data model), 4 (dashboard rewrite), 5 (status logic), 6 (settings), 7 (PM Status), 8 (history), 9 (notifications), 15 (delete), 17 (smart import + templates), 18 (README) are one large, tightly-coupled frontend refactor. **I can do all of that well in one round.** It's mechanical work grounded in a clear spec.
+- **A1 Register link**: audit `/auth`'s "Request access" link, confirm `src/routes/register.tsx` is in `routeTree.gen.ts`, and that the link uses `<Link to="/register">`. Playwright: load `/auth`, click, assert `/register` renders the form.
+- **A2 Username OR email login**: add `username` (unique) to `StoredUser` + migration `0003_username.sql`. Register + Admin "Create user" forms collect username. Login field label becomes "Email or username" — if input contains `@`, match by email else by username. Migration back-fills username from the local-part of email for existing rows.
+- **A3 Real sessions**:
+  - On successful login: mark all prior sessions for that user `revoked` (single active session per account — simpler + matches your test criteria).
+  - `Last active` updated on every route change via a small `useTouchSession` hook in `AppShell`.
+  - Sign-out revokes the current session immediately.
+  - Sessions tab derives status: `Revoked` if revoked, else `Expired` if `lastActiveAt` older than 8h, else `Active`.
+- **A4 Templates**: rebuild `src/lib/templates.ts` using `exceljs` (already common) or hand-rolled OOXML — I'll use `exceljs` (add dep). Set explicit column widths sized to header + sample, bold header fill (`FFEFEFEF`), freeze row 1, one example row, no merged cells, `.xlsx` mime. Verify by generating in Node and opening bytes with `unzip -l` + parsing back with `exceljs` to confirm styles round-trip.
+- **A5 Liquid glass rework**: rebuild the shell so navbar + sidebar are inset floating panels (margin around them, `rounded-2xl`), heavy `backdrop-blur-2xl`, translucent bg (`bg-white/55 dark:bg-slate-900/45`), inner top highlight via `::before` gradient border, layered shadows, and an app-wide ambient background: two low-opacity radial gradient blobs fixed behind everything (pink/violet in light, indigo/cyan in dark). Apply same treatment to `DropdownMenu`, `Dialog`, `Popover`, and Settings/Help `TabsList`+`TabsContent`. Respect `prefers-reduced-motion`.
 
-Sections 1, 2, 10, 13, 14 are **backend work**. The current app has no live D1 — `wrangler.toml` still has `REPLACE_ME_WITH_YOUR_D1_ID`, there are no server routes, no `/api/*` handlers, no session middleware. Doing this "properly" means:
+## Part D — Security hardening (before Phase 2 so new modules use it)
 
-- Writing `src/routes/api/auth/{login,register,logout,session}.ts` server routes hitting D1 via the `DB` binding.
-- Writing `src/routes/api/users/*`, `api/instruments/*`, `api/tasks/*`, `api/sessions/*` routes.
-- PBKDF2 password hashing, HttpOnly cookie sessions, rate-limiting (needs KV or Durable Object — D1 alone is a bad fit for counters), CSP headers.
-- Ripping out `auth-store.ts` (localStorage) and rewriting every page to fetch from server routes with proper loading/error states.
-- Migrating the Zustand-persisted `store.ts` off localStorage onto D1 too (otherwise `createdBy`, delete, session revocation, and the "bootstrap is truly one-time across devices" guarantee in §1 are all impossible — they all require server-side truth).
+- Real server auth at `src/routes/api/auth/{login,register,logout,me}.ts` using D1 via `env.DB` from `getRequest()` context (Cloudflare bindings). PBKDF2 verify server-side; issue `sid` cookie: `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800`.
+- `sessions` table in D1 with `id, user_id, created_at, last_active_at, revoked_at, ip, ua`.
+- Rate limit: KV namespace `RATE_LIMIT` — 5 login attempts / 15 min / IP+identifier; 3 registrations / hour / IP. Documented `wrangler kv namespace create RATE_LIMIT` step.
+- Security headers in `src/server.ts`: `Content-Security-Policy` (self + inline styles for tailwind, `'unsafe-inline'` only for styles, no inline scripts), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
+- All D1 queries use `?` placeholders — audit and confirm.
+- Client keeps the Zustand store as an offline fallback + optimistic cache; when `env.DB` is bound (detected via `/api/auth/me` returning 200), the store hydrates from server. When not bound (Lovable preview), it falls back to local storage so testing still works.
 
-That's a second, equally large refactor. **Attempting both in one turn will produce half-broken backend code you can't verify without deploying, plus a rushed frontend.** You explicitly said everything must meet the polish bar — rushing both halves violates that.
+**What can't be verified in preview**: real cookie `Secure` + cross-domain behavior, KV rate-limit counters, and CSP enforcement all require a Cloudflare deploy. Code paths are complete and typed.
 
-## What I recommend for this round
+## Part B — Phase 2 data model
 
-**Do the full frontend refactor + templates + README this round, and scaffold the backend contracts without cutting over.** Concretely:
+- **B1**: add `unit`, `statusInstrument`, `subType` to `Instrument`. New Settings lists `units[]`, `instrumentStatuses[]` (seeded `Active`, `Standby`, `Decommissioned`). Filter chips on Instruments/Maintenance/Dashboard extended with `Unit`. `statusInstrument` shows as badge.
+- **B2 Task List master**: `taskListItems: {id, equipmentType, activityName, category, mandatory}` in store + Settings tab "Task List". Admin & User editable.
+- **B3 PM Detail**: `pmDetails: {id, pmTaskId, taskName, result: 'OK'|'NG', catatan?}`. Expandable checklist in PM Task detail; pre-populates from Task List for that equipment type.
+- **B4 Calibration**: new sidebar item `/calibration`, table + add/edit dialog. `error = asFound - asLeft` (numeric difference); note in README that % deviation can be swapped in later.
+- **B5 Downtime**: `/downtime`, auto `durasi` in minutes (rendered as `Hh Mm`).
+- **B6 Failure History**: `/failures`.
+- **B7 Reliability Analytics**: new Dashboard card group "Reliability (Phase 2)". MTTR = mean downtime duration. MTBF = mean gap between consecutive `failureDate`s per instrument, then averaged. Availability = `MTBF/(MTBF+MTTR)`. Empty-data guard shows the "Not enough data yet…" message per metric.
+- **B8 Good/Substandard/Remaining**: stacked bar on Dashboard per Area and per Equipment Type using the mapping you specified. Legend footnote calls out the assumption.
+- **B9 Completion Rate KPI**: all-time `Finish / total` scheduled records, separate card from "Progress PM Bulan Ini".
+- **B10 Evidence**: add `evidence?: string` to `PmTaskRecord`; remove `"evidence"` from `IGNORE_HEADERS` and add alias `evidence: ["evidence","bukti","foto","attachment","photo"]`. Rendered in task detail; note about R2 future upload in README.
+- **B11 Help & Guide + Smart Import aliases + README** — bilingual EN/ID sections added for each new module; new aliases (`asFound`, `asLeft`, `error`, `result`, `startTime`, `finishTime`, `penyebab`, `tindakan`, `severity`, `rootCause`, `unit`, `statusInstrument`, `subType`, `evidence`).
 
-### Fully implemented this round
-1. **§3 New data model** — rewrite `types.ts`, `store.ts`, D1 migration `0002_new_model.sql`, seed/reset paths.
-2. **§4 Dashboard** — new KPIs, Progress per Area bar, Equipment donut, Due-soon table, filters incl. Equipment Type.
-3. **§5 Status derivation** — pure function + auto-recompute in store; manual `Inprogress` override.
-4. **§6 Settings** — Area list, Equipment Type list, PM Frequency per type, Upcoming window; drop health/calibration/criticality.
-5. **§7 PM Status page** — rename route, traffic-light grid grounded in latest task per instrument.
-6. **§8 Maintenance History** — new columns, filters, CSV export.
-7. **§9 Notifications** — trigger on `Behind`, escalation keyed off **Area** (better fit than Equipment Type — Area maps to org units).
-8. **§11 Logo alignment** — `items-center` + normalized line-heights in `brand.tsx`.
-9. **§12 Liquid-glass rework** — real `backdrop-blur-2xl`, translucent tints, top highlight, layered shadow, motion on dropdowns/dialogs/cards, crossfade on theme toggle. I'll list exact locations in my reply.
-10. **§15 Delete** — instruments (cascade PM tasks, with confirm listing count) + PM tasks, from tables + drawer.
-11. **§14 createdBy** — captured client-side from current user for now; carries over cleanly when auth moves server-side.
-12. **§16 Help & Guide** — full rewrite of both languages for new model + natural Bahasa Indonesia + Register/approval entry.
-13. **§17 Smart Import** — new alias dictionary, ignore lists, header-row scan (already there), non-record sheet detection, and **two proper `.xlsx` templates** (styled headers, greyed example rows, column widths) generated via the existing `xlsx` dep and downloadable from Input Data.
-14. **§18 README** — full rewrite reflecting all of the above, with honest notes on what's client-side today.
+## Part C — Smart Import patterns
 
-### Scaffolded but not cut over (with a clear TODO in README)
-- **§1 Bootstrap check**, **§2 Register/approve**, **§10 Server-side auth + PBKDF2 + HttpOnly cookies + rate limit**, **§13 Sessions panel**.
+Rewrite `src/lib/smart-import.ts` sheet router:
+- **Pattern detection order** per sheet: (1) sheet name starts with "Task List" OR has `URAIAN PEKERJAAN` + no `Tag Number` → Pattern B. (2) Two-row header with `Good/Repair/Broken` triplets → Pattern A (parse main region + embedded downtime region). (3) Else existing header-scan (Instrument / PM Task / summary skip).
+- **Pattern A**: infer `equipmentType` from sheet name (`PM Control Valve` → `Control Valve`, `Junction Box` → `Junction Box`). Emit one PM Task Record per row + one PM Detail per non-blank component group. If component group not in Task List for that equipment type → auto-create the Task List entry (simplest, avoids free-text drift). Bare-year dates parsed as empty planDate — row still imported.
+- **Pattern A Region B (embedded Catatan Pemeriksaan)**: scan below the main table for header row containing `Equip. No.` + `Gangguan` + `Tindakan`; emit Downtime records. Blank rows skipped; missing region does not block Region A.
+- **Pattern B**: emit Task List entries only; `category` = most recent all-caps section header; `mandatory = true` default. Ignore P/K/supervisor columns.
+- **Preview UI (C4)**: import wizard now shows per-sheet outcome lines like `PM Control Valve → 12 PM Tasks + 34 PM Details`, `Task List Transmitter → 18 Task List entries`, `Transmitter_1 → 89 Instruments`. Confirm dialog groups by outcome type before committing.
 
-For these I'll:
-- Add the `status` field + Pending Requests UI + Sessions tab UI + Register page + "awaiting approval" login message, all wired to the existing client store so the **UX and flows are complete and testable end-to-end today**.
-- Add the D1 schema for `users.status`, `sessions`, PBKDF2 columns.
-- Add stub server routes at `src/routes/api/auth/*` with the real PBKDF2 + cookie logic written and unit-safe, gated behind a `USE_SERVER_AUTH` flag that's `false` until you paste a real D1 ID and deploy.
-- README section explaining exactly how to flip the flag after `wrangler d1 create` + `wrangler secret put SESSION_SECRET`.
+## Part E — README
 
-The bootstrap guarantee you asked about in §1 is **not structurally possible in a client-only app** — any localStorage flag can be cleared. I'll make the client check `users.length === 0` (not a flag) so it's at least not bypassable by clearing a single key, and I'll document that the true guarantee lands the moment you deploy with D1 (`SELECT COUNT(*) FROM users`), which the scaffolded server route already does correctly.
+Update sections: bug-fix changelog, Phase 2 modules (Calibration/Downtime/Failures/Task List/PM Detail + formulas + empty-data behavior), Unit/Status Instrument/Sub-Type fields, Good/Substandard/Remaining mapping, Completion Rate scope, Evidence tracking (+ R2 note), the two Smart Import patterns + embedded Downtime region, server-auth deploy steps (D1 migration 0003, KV namespace create, security headers), and an "Open questions for client" callout listing B1/B8/B9/C1 assumptions.
 
-### The alternative: full backend cutover this round
-If you'd rather I attempt the full server-side auth + D1 cutover in this round, I'll do it, but I need you to accept:
-- I cannot verify it end-to-end without a real D1 ID + deploy — I'll be shipping code you have to test on Cloudflare.
-- Frontend polish will be shallower because time is split.
-- Rate limiting will be best-effort in D1 (no KV binding configured).
+## Judgment calls (flagged in reply after implementation)
 
-## Judgment calls I'll make unless you say otherwise
-- **Escalation keyed off Area** (§9) — Area maps to org responsibility better than Equipment Type.
-- **Delete cascade** (§15) — deleting an Instrument cascade-deletes its PM Task Records, with a confirm dialog stating the count. Safer than orphaned records.
-- **PM Frequency unit list** — `minggu | bulan | tahun` only, matching the real files.
-- **"Upcoming" window** default 14 days, editable in Settings.
-- **Templates** as `.xlsx` (not CSV) since the team uses Excel and you asked for styled headers.
+- Single active session per user (A3) rather than multi-device — matches your test spec exactly.
+- Calibration lives at its own `/calibration` sidebar item (cleaner than nesting inside PM Status).
+- Reliability metrics live in a "Reliability (Phase 2)" section on the Dashboard, below Progress PM, not a separate route — keeps a single overview.
+- Pattern A auto-creates missing Task List entries rather than storing free text on PM Detail.
+- MTBF: per-instrument mean gap between consecutive failures, then simple mean across instruments with ≥2 failures.
+- Rate limits: 5/15min login, 3/hour register — conservative defaults, tunable in one constant.
 
-## What I need from you
-**One reply: "go recommended" or "go full backend".** Then I execute the entire round without further questions. If I don't hear back I'll proceed with the recommended path.
+Approve and I'll start with Part A and drive Playwright to confirm A1–A3 visually before continuing.
