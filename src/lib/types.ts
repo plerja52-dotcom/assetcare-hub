@@ -41,6 +41,8 @@ export interface PmTaskRecord {
   manualStatus?: boolean;     // when user forces Inprogress
   perbaikanLanjutan?: string;
   catatan?: string;
+  /** Phase 2 — text reference to evidence (filename, URL, or note). File uploads via R2 tbd. */
+  evidence?: string;
   createdBy?: string;
   createdAt?: string;
 }
