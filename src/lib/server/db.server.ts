@@ -167,24 +167,38 @@ export async function insertUser(u: UserRow): Promise<void> {
   await writeFile(file);
 }
 
-export async function updateUserFields(
-  id: string,
-  patch: Partial<Pick<UserRow, "name" | "role" | "active" | "status">>,
-): Promise<void> {
-  const db = d1();
+export interface UserPatch {
+  name?: string;
+  role?: Role;
+  active?: boolean;
+  status?: UserStatus;
+}
+
+export async function updateUserFields(id: string, patch: UserPatch): Promise<void> {
   const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
   if (entries.length === 0) return;
+  const db = d1();
   if (db) {
     await ensureD1Schema(db);
-    const cols = entries.map(([k], i) => `${k} = ?${i + 2}`).join(", ");
-    const values = entries.map(([, v]) => (typeof v === "boolean" ? (v ? 1 : 0) : v));
+    // Column allow-list keyed off UserPatch — never interpolate arbitrary keys.
+    const ALLOWED = new Set(["name", "role", "active", "status"]);
+    const safe = entries.filter(([k]) => ALLOWED.has(k));
+    if (safe.length === 0) return;
+    const cols = safe.map(([k], i) => `${k} = ?${i + 2}`).join(", ");
+    const values = safe.map(([, v]) => (typeof v === "boolean" ? (v ? 1 : 0) : v));
     await db.prepare(`UPDATE users SET ${cols} WHERE id = ?1`).bind(id, ...values).run();
     return;
   }
   const file = await readFile();
-  file.users = file.users.map((u) =>
-    u.id === id ? { ...u, ...patch, active: (patch.active as unknown as number) ?? u.active } : u,
-  );
+  file.users = file.users.map((u) => {
+    if (u.id !== id) return u;
+    const next: UserRow = { ...u };
+    if (patch.name !== undefined) next.name = patch.name;
+    if (patch.role !== undefined) next.role = patch.role;
+    if (patch.status !== undefined) next.status = patch.status;
+    if (patch.active !== undefined) next.active = patch.active ? 1 : 0;
+    return next;
+  });
   await writeFile(file);
 }
 
