@@ -309,8 +309,8 @@ function HelpPage() {
             <div className="mt-6 flex items-center gap-2 text-[11px] text-muted-foreground">
               <HelpCircle className="h-3.5 w-3.5" />
               {lang === "en"
-                ? "For deeper deployment steps (Cloudflare + D1), see the README bundled with the project."
-                : "Untuk panduan deploy detail (Cloudflare + D1), silakan lihat README yang disertakan bersama project."}
+                ? "For deeper deployment steps, see the README bundled with the project."
+                : "Untuk panduan deploy detail, silakan lihat README yang disertakan bersama project."}
             </div>
           </CardContent>
         </Card>

@@ -99,15 +99,15 @@
   --sidebar-border: oklch(0.92 0.005 260);
   --sidebar-ring: oklch(0.56 0.22 25);
 
-  /* Liquid-glass tokens (light) — stronger translucency + softer edges */
-  --glass-bg: color-mix(in oklab, var(--card) 45%, transparent);
-  --glass-sidebar-bg: color-mix(in oklab, var(--sidebar) 50%, transparent);
-  --glass-border: color-mix(in oklab, white 60%, transparent);
-  --glass-highlight: rgba(255, 255, 255, 0.85);
+  /* Liquid-glass tokens (light) — stronger edge + shadow so translucency reads on white */
+  --glass-bg: color-mix(in oklab, var(--card) 72%, transparent);
+  --glass-sidebar-bg: color-mix(in oklab, var(--sidebar) 74%, transparent);
+  --glass-border: color-mix(in oklab, oklch(0.55 0.02 260) 22%, transparent);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
   --glass-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 8px 24px -8px rgba(15, 23, 42, 0.10),
-    0 24px 56px -20px rgba(15, 23, 42, 0.18);
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 10px 30px -10px rgba(15, 23, 42, 0.14),
+    0 30px 64px -24px rgba(15, 23, 42, 0.22);
 }
 
 .dark {
@@ -195,12 +195,22 @@
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(600px 400px at 12% 8%, color-mix(in oklab, var(--info) 22%, transparent), transparent 60%),
-      radial-gradient(700px 500px at 92% 18%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 62%),
-      radial-gradient(500px 400px at 78% 92%, color-mix(in oklab, var(--sce) 18%, transparent), transparent 60%),
-      radial-gradient(500px 400px at 8% 92%, color-mix(in oklab, var(--success) 14%, transparent), transparent 60%);
+      radial-gradient(600px 400px at 12% 8%, color-mix(in oklab, var(--info) 40%, transparent), transparent 60%),
+      radial-gradient(700px 500px at 92% 18%, color-mix(in oklab, var(--primary) 32%, transparent), transparent 62%),
+      radial-gradient(500px 400px at 78% 92%, color-mix(in oklab, var(--sce) 32%, transparent), transparent 60%),
+      radial-gradient(500px 400px at 8% 92%, color-mix(in oklab, var(--success) 28%, transparent), transparent 60%);
     opacity: 0.55;
   }
+}
+/* Dark mode keeps softer opacity — the darker canvas doesn't need as much color. */
+.dark .ambient-bg::before,
+:is(.dark) .ambient-bg::before {
+  background:
+    radial-gradient(600px 400px at 12% 8%, color-mix(in oklab, var(--info) 22%, transparent), transparent 60%),
+    radial-gradient(700px 500px at 92% 18%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 62%),
+    radial-gradient(500px 400px at 78% 92%, color-mix(in oklab, var(--sce) 18%, transparent), transparent 60%),
+    radial-gradient(500px 400px at 8% 92%, color-mix(in oklab, var(--success) 14%, transparent), transparent 60%);
+  opacity: 0.55;
 }
 
 /* -------------------------- Liquid glass utilities -------------------------- */
