@@ -72,11 +72,14 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
+import { runWithEnv, type WorkerEnv } from "./lib/server/env-context";
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
+      // Expose Cloudflare env (with D1 binding) to server-route handlers via AsyncLocalStorage.
+      const response = await runWithEnv((env ?? {}) as WorkerEnv, () => handler.fetch(request, env, ctx));
       return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);

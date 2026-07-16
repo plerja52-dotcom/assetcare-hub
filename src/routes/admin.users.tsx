@@ -13,12 +13,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import {
-  deriveSessionStatus,
-  hashPassword, randomSalt, useAuthStore, useIsAdmin, type Role, type StoredUser,
+  apiCreateUser, apiDeleteUser, apiListSessions, apiListUsers, apiPatchUser, apiRevokeSession,
+  deriveSessionStatus, useIsAdmin, type AdminSessionRow, type AuthUser, type Role,
 } from "@/lib/auth-store";
 import { toast } from "sonner";
-import { useState } from "react";
-import { Check, ShieldCheck, ShieldOff, Trash2, UserPlus, X, XCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Check, Loader2, ShieldCheck, ShieldOff, Trash2, UserPlus, X, XCircle } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -31,9 +31,22 @@ export const Route = createFileRoute("/admin/users")({
 
 function AdminUsersPage() {
   const isAdmin = useIsAdmin();
-  const {
-    users, sessions, addUser, updateUser, removeUser, approveUser, rejectUser, revokeSession,
-  } = useAuthStore();
+  const [users, setUsers] = useState<AuthUser[]>([]);
+  const [sessions, setSessions] = useState<AdminSessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    if (!isAdmin) return;
+    setLoading(true);
+    try {
+      const [u, s] = await Promise.all([apiListUsers(), apiListSessions()]);
+      setUsers(u); setSessions(s);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load users");
+    } finally { setLoading(false); }
+  }, [isAdmin]);
+
+  useEffect(() => { void reload(); }, [reload]);
 
   if (!isAdmin) {
     return (
@@ -52,9 +65,24 @@ function AdminUsersPage() {
   const active = users.filter((u) => u.status !== "pending");
   const activeSessionsCount = sessions.filter((s) => deriveSessionStatus(s) === "Active").length;
 
+  async function withReload(op: () => Promise<unknown>, okMsg?: string) {
+    try {
+      await op();
+      if (okMsg) toast.success(okMsg);
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Action failed");
+    }
+  }
+
   return (
     <AppShell>
       <PageHeader title="User Management" description="Approve requests, manage accounts and roles, monitor sessions." />
+      {loading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+        </div>
+      )}
       <Tabs defaultValue="users">
         <TabsList className="glass-surface border border-border/60">
           <TabsTrigger value="users">Users <Badge variant="secondary" className="ml-1.5">{active.length}</Badge></TabsTrigger>
@@ -66,8 +94,12 @@ function AdminUsersPage() {
 
         <TabsContent value="users">
           <div className="grid gap-4 md:grid-cols-[1fr_320px] mt-2">
-            <UsersTable users={active} updateUser={updateUser} removeUser={removeUser} />
-            <NewUserCard addUser={addUser} existing={users} />
+            <UsersTable
+              users={active}
+              onPatch={(id, patch) => withReload(() => apiPatchUser(id, patch))}
+              onDelete={(id, name) => withReload(() => apiDeleteUser(id), `${name} removed`)}
+            />
+            <NewUserCard onCreate={(input) => withReload(() => apiCreateUser(input), `${input.name} added`)} />
           </div>
         </TabsContent>
 
@@ -97,10 +129,10 @@ function AdminUsersPage() {
                           {u.createdAt ? new Date(u.createdAt).toLocaleString() : "—"}
                         </TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button size="sm" onClick={() => { approveUser(u.id); toast.success(`${u.name} approved`); }}>
+                          <Button size="sm" onClick={() => withReload(() => apiPatchUser(u.id, { action: "approve" }), `${u.name} approved`)}>
                             <Check className="h-4 w-4 mr-1" />Approve
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => { rejectUser(u.id); toast.success(`${u.name} rejected`); }}>
+                          <Button size="sm" variant="outline" onClick={() => withReload(() => apiPatchUser(u.id, { action: "reject" }), `${u.name} rejected`)}>
                             <XCircle className="h-4 w-4 mr-1" />Reject
                           </Button>
                         </TableCell>
@@ -135,12 +167,8 @@ function AdminUsersPage() {
                       return (
                         <TableRow key={s.id}>
                           <TableCell className="font-medium">{s.userName}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {new Date(s.loginAt).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {new Date(s.lastActiveAt).toLocaleString()}
-                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{new Date(s.loginAt).toLocaleString()}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{new Date(s.lastActiveAt).toLocaleString()}</TableCell>
                           <TableCell>
                             {status === "Active" && <Badge variant="outline" className="text-success border-success/40">Active</Badge>}
                             {status === "Expired" && <Badge variant="outline" className="text-muted-foreground border-border">Expired</Badge>}
@@ -148,7 +176,7 @@ function AdminUsersPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <Button size="sm" variant="outline" disabled={status !== "Active"}
-                              onClick={() => { revokeSession(s.id); toast.success("Session revoked"); }}>
+                              onClick={() => withReload(() => apiRevokeSession(s.id), "Session revoked")}>
                               <X className="h-4 w-4 mr-1" />Revoke
                             </Button>
                           </TableCell>
@@ -166,12 +194,12 @@ function AdminUsersPage() {
   );
 }
 
-function UsersTable({ users, updateUser, removeUser }: {
-  users: StoredUser[];
-  updateUser: (id: string, patch: Partial<StoredUser>) => void;
-  removeUser: (id: string) => void;
+function UsersTable({ users, onPatch, onDelete }: {
+  users: AuthUser[];
+  onPatch: (id: string, patch: { role?: Role; active?: boolean }) => void;
+  onDelete: (id: string, name: string) => void;
 }) {
-  const [confirmDel, setConfirmDel] = useState<StoredUser | null>(null);
+  const [confirmDel, setConfirmDel] = useState<AuthUser | null>(null);
   return (
     <>
       <Card className="glass-panel border-0">
@@ -197,7 +225,7 @@ function UsersTable({ users, updateUser, removeUser }: {
                     <TableCell className="text-sm text-muted-foreground">{u.username}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                     <TableCell>
-                      <Select value={u.role} onValueChange={(v) => updateUser(u.id, { role: v as Role })}>
+                      <Select value={u.role} onValueChange={(v) => onPatch(u.id, { role: v as Role })}>
                         <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Admin">Admin</SelectItem>
@@ -207,7 +235,7 @@ function UsersTable({ users, updateUser, removeUser }: {
                     </TableCell>
                     <TableCell>
                       <Button size="sm" variant={u.active ? "outline" : "default"}
-                        onClick={() => updateUser(u.id, { active: !u.active })}>
+                        onClick={() => onPatch(u.id, { active: !u.active })}>
                         {u.active ? "Active" : "Disabled"}
                       </Button>
                     </TableCell>
@@ -236,7 +264,7 @@ function UsersTable({ users, updateUser, removeUser }: {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction className="bg-primary text-primary-foreground hover:opacity-90"
-              onClick={() => { if (confirmDel) { removeUser(confirmDel.id); toast.success("User removed"); setConfirmDel(null); } }}>
+              onClick={() => { if (confirmDel) { onDelete(confirmDel.id, confirmDel.name); setConfirmDel(null); } }}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -246,9 +274,8 @@ function UsersTable({ users, updateUser, removeUser }: {
   );
 }
 
-function NewUserCard({ addUser, existing }: {
-  addUser: (u: StoredUser) => void;
-  existing: StoredUser[];
+function NewUserCard({ onCreate }: {
+  onCreate: (input: { name: string; username: string; email: string; password: string; role: Role }) => void;
 }) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -260,19 +287,9 @@ function NewUserCard({ addUser, existing }: {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name || !username || !email || password.length < 8) { toast.error("Fill in all fields (min 8-char password)"); return; }
-    const uname = username.trim().toLowerCase();
-    if (existing.some((u) => u.email.toLowerCase() === email.toLowerCase())) { toast.error("Email already exists"); return; }
-    if (existing.some((u) => u.username.toLowerCase() === uname)) { toast.error("Username already exists"); return; }
     setBusy(true);
     try {
-      const salt = randomSalt();
-      const passwordHash = await hashPassword(password, salt);
-      addUser({
-        id: crypto.randomUUID(), name, username: uname, email, role,
-        active: true, status: "approved",
-        salt, passwordHash, createdAt: new Date().toISOString(),
-      });
-      toast.success(`${name} added`);
+      onCreate({ name, username: username.toLowerCase(), email, password, role });
       setName(""); setUsername(""); setEmail(""); setPassword("");
     } finally { setBusy(false); }
   }

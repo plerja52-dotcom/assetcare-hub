@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Wrench,
@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
 import { Brand } from "@/components/brand";
 import { cn } from "@/lib/utils";
-import { useAuthStore, useCurrentUser } from "@/lib/auth-store";
+import { useCurrentUser, useSessionStore } from "@/lib/auth-store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,7 +90,7 @@ function ThemeToggle() {
 function UserMenu() {
   const user = useCurrentUser();
   const navigate = useNavigate();
-  const signOut = useAuthStore((s) => s.signOut);
+  const signOut = useSessionStore((s) => s.signOut);
   if (!user) return null;
   const initials = user.name
     .split(" ")
@@ -125,8 +125,8 @@ function UserMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
-          onSelect={() => {
-            signOut();
+          onSelect={async () => {
+            await signOut();
             navigate({ to: "/auth", replace: true });
           }}
           className="text-primary focus:text-primary"
@@ -141,9 +141,6 @@ function UserMenu() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState(false);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const touchCurrentSession = useAuthStore((s) => s.touchCurrentSession);
-  useEffect(() => { touchCurrentSession(); }, [pathname, touchCurrentSession]);
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300 ambient-bg">
       {/* Header — liquid glass, floating */}
@@ -169,9 +166,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Sidebar — floating glass */}
         <aside className="hidden md:flex md:w-60 md:shrink-0 md:flex-col rounded-2xl glass-sidebar min-h-[calc(100vh-6rem)] sticky top-20 self-start">
           <NavList />
-          <div className="mt-auto p-3 text-[11px] text-muted-foreground">
-            v1.3 · Cloudflare-ready
-          </div>
         </aside>
 
         {/* Drawer mobile */}

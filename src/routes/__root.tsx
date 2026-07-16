@@ -15,7 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "../lib/theme";
 import { Toaster } from "@/components/ui/sonner";
-import { useAuthStore } from "@/lib/auth-store";
+import { useSessionStore } from "@/lib/auth-store";
 
 function NotFoundComponent() {
   return (
@@ -129,18 +129,27 @@ function RootShell({ children }: { children: ReactNode }) {
 const PUBLIC_ROUTES = new Set(["/auth", "/register"]);
 
 function AuthGate({ children }: { children: ReactNode }) {
-  const currentUserId = useAuthStore((s) => s.currentUserId);
+  const { user, ready, refresh, refreshBootstrap } = useSessionStore();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const isPublic = PUBLIC_ROUTES.has(pathname);
 
+  useEffect(() => { void refresh(); void refreshBootstrap(); }, [refresh, refreshBootstrap]);
+
   useEffect(() => {
-    if (!currentUserId && !isPublic) {
+    if (ready && !user && !isPublic) {
       navigate({ to: "/auth", replace: true });
     }
-  }, [currentUserId, isPublic, navigate]);
+  }, [ready, user, isPublic, navigate]);
 
-  if (!currentUserId && !isPublic) return null;
+  if (!ready && !isPublic) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-xs text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+  if (!user && !isPublic) return null;
   return <>{children}</>;
 }
 

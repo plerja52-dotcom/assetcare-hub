@@ -20,6 +20,15 @@ import { Route as HealthRouteImport } from './routes/health'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as ApiAuthRegisterRouteImport } from './routes/api/auth/register'
+import { Route as ApiAuthMeRouteImport } from './routes/api/auth/me'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
+import { Route as ApiAuthBootstrapStatusRouteImport } from './routes/api/auth/bootstrap-status'
+import { Route as ApiAdminUsersRouteImport } from './routes/api/admin/users'
+import { Route as ApiAdminSessionsRouteImport } from './routes/api/admin/sessions'
+import { Route as ApiAdminUsersIdRouteImport } from './routes/api/admin/users.$id'
+import { Route as ApiAdminSessionsIdRouteImport } from './routes/api/admin/sessions.$id'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -76,6 +85,51 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthRegisterRoute = ApiAuthRegisterRouteImport.update({
+  id: '/api/auth/register',
+  path: '/api/auth/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
+  id: '/api/auth/me',
+  path: '/api/auth/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthBootstrapStatusRoute = ApiAuthBootstrapStatusRouteImport.update({
+  id: '/api/auth/bootstrap-status',
+  path: '/api/auth/bootstrap-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsersRoute = ApiAdminUsersRouteImport.update({
+  id: '/api/admin/users',
+  path: '/api/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSessionsRoute = ApiAdminSessionsRouteImport.update({
+  id: '/api/admin/sessions',
+  path: '/api/admin/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsersIdRoute = ApiAdminUsersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiAdminUsersRoute,
+} as any)
+const ApiAdminSessionsIdRoute = ApiAdminSessionsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiAdminSessionsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +143,15 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/admin/sessions': typeof ApiAdminSessionsRouteWithChildren
+  '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/bootstrap-status': typeof ApiAuthBootstrapStatusRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/register': typeof ApiAuthRegisterRoute
+  '/api/admin/sessions/$id': typeof ApiAdminSessionsIdRoute
+  '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +165,15 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/admin/sessions': typeof ApiAdminSessionsRouteWithChildren
+  '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/bootstrap-status': typeof ApiAuthBootstrapStatusRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/register': typeof ApiAuthRegisterRoute
+  '/api/admin/sessions/$id': typeof ApiAdminSessionsIdRoute
+  '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +188,15 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/admin/sessions': typeof ApiAdminSessionsRouteWithChildren
+  '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/bootstrap-status': typeof ApiAuthBootstrapStatusRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/register': typeof ApiAuthRegisterRoute
+  '/api/admin/sessions/$id': typeof ApiAdminSessionsIdRoute
+  '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +212,15 @@ export interface FileRouteTypes {
     | '/register'
     | '/settings'
     | '/admin/users'
+    | '/api/admin/sessions'
+    | '/api/admin/users'
+    | '/api/auth/bootstrap-status'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/register'
+    | '/api/admin/sessions/$id'
+    | '/api/admin/users/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +234,15 @@ export interface FileRouteTypes {
     | '/register'
     | '/settings'
     | '/admin/users'
+    | '/api/admin/sessions'
+    | '/api/admin/users'
+    | '/api/auth/bootstrap-status'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/register'
+    | '/api/admin/sessions/$id'
+    | '/api/admin/users/$id'
   id:
     | '__root__'
     | '/'
@@ -157,6 +256,15 @@ export interface FileRouteTypes {
     | '/register'
     | '/settings'
     | '/admin/users'
+    | '/api/admin/sessions'
+    | '/api/admin/users'
+    | '/api/auth/bootstrap-status'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/register'
+    | '/api/admin/sessions/$id'
+    | '/api/admin/users/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +279,13 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  ApiAdminSessionsRoute: typeof ApiAdminSessionsRouteWithChildren
+  ApiAdminUsersRoute: typeof ApiAdminUsersRouteWithChildren
+  ApiAuthBootstrapStatusRoute: typeof ApiAuthBootstrapStatusRoute
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthRegisterRoute: typeof ApiAuthRegisterRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,8 +367,94 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/register': {
+      id: '/api/auth/register'
+      path: '/api/auth/register'
+      fullPath: '/api/auth/register'
+      preLoaderRoute: typeof ApiAuthRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/me': {
+      id: '/api/auth/me'
+      path: '/api/auth/me'
+      fullPath: '/api/auth/me'
+      preLoaderRoute: typeof ApiAuthMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/bootstrap-status': {
+      id: '/api/auth/bootstrap-status'
+      path: '/api/auth/bootstrap-status'
+      fullPath: '/api/auth/bootstrap-status'
+      preLoaderRoute: typeof ApiAuthBootstrapStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/users': {
+      id: '/api/admin/users'
+      path: '/api/admin/users'
+      fullPath: '/api/admin/users'
+      preLoaderRoute: typeof ApiAdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/sessions': {
+      id: '/api/admin/sessions'
+      path: '/api/admin/sessions'
+      fullPath: '/api/admin/sessions'
+      preLoaderRoute: typeof ApiAdminSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/users/$id': {
+      id: '/api/admin/users/$id'
+      path: '/$id'
+      fullPath: '/api/admin/users/$id'
+      preLoaderRoute: typeof ApiAdminUsersIdRouteImport
+      parentRoute: typeof ApiAdminUsersRoute
+    }
+    '/api/admin/sessions/$id': {
+      id: '/api/admin/sessions/$id'
+      path: '/$id'
+      fullPath: '/api/admin/sessions/$id'
+      preLoaderRoute: typeof ApiAdminSessionsIdRouteImport
+      parentRoute: typeof ApiAdminSessionsRoute
+    }
   }
 }
+
+interface ApiAdminSessionsRouteChildren {
+  ApiAdminSessionsIdRoute: typeof ApiAdminSessionsIdRoute
+}
+
+const ApiAdminSessionsRouteChildren: ApiAdminSessionsRouteChildren = {
+  ApiAdminSessionsIdRoute: ApiAdminSessionsIdRoute,
+}
+
+const ApiAdminSessionsRouteWithChildren =
+  ApiAdminSessionsRoute._addFileChildren(ApiAdminSessionsRouteChildren)
+
+interface ApiAdminUsersRouteChildren {
+  ApiAdminUsersIdRoute: typeof ApiAdminUsersIdRoute
+}
+
+const ApiAdminUsersRouteChildren: ApiAdminUsersRouteChildren = {
+  ApiAdminUsersIdRoute: ApiAdminUsersIdRoute,
+}
+
+const ApiAdminUsersRouteWithChildren = ApiAdminUsersRoute._addFileChildren(
+  ApiAdminUsersRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -267,17 +468,14 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
+  ApiAdminSessionsRoute: ApiAdminSessionsRouteWithChildren,
+  ApiAdminUsersRoute: ApiAdminUsersRouteWithChildren,
+  ApiAuthBootstrapStatusRoute: ApiAuthBootstrapStatusRoute,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthRegisterRoute: ApiAuthRegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
