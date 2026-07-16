@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { hashPassword, randomSalt, useAuthStore, type StoredUser } from "@/lib/auth-store";
+import { apiRegister, useSessionStore } from "@/lib/auth-store";
 import { Brand } from "@/components/brand";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/register")({
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { users, addUser } = useAuthStore();
+  const { needsBootstrap, refreshBootstrap } = useSessionStore();
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -25,9 +25,11 @@ function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  if (users.length === 0) {
+  useEffect(() => { void refreshBootstrap(); }, [refreshBootstrap]);
+
+  if (needsBootstrap === true) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4 ambient-bg">
         <Card className="w-full max-w-sm glass-panel border-0">
           <CardContent className="p-8 text-center space-y-3">
             <Brand size="lg" showSubtitle={false} linkTo={null} />
@@ -47,35 +49,18 @@ function RegisterPage() {
     if (!name.trim() || !username.trim() || !email.trim() || password.length < 8) {
       setError("Name, username, email, and a password of at least 8 characters are required."); return;
     }
-    const uname = username.trim().toLowerCase();
-    if (users.some((u) => u.email.toLowerCase() === email.trim().toLowerCase())) {
-      setError("An account with this email already exists."); return;
-    }
-    if (users.some((u) => u.username.toLowerCase() === uname)) {
-      setError("That username is already taken."); return;
-    }
     setBusy(true);
     try {
-      const salt = randomSalt();
-      const passwordHash = await hashPassword(password, salt);
-      const user: StoredUser = {
-        id: crypto.randomUUID(),
-        name: name.trim(), username: uname, email: email.trim(),
-        role: "User", active: false, status: "pending",
-        salt, passwordHash, createdAt: new Date().toISOString(),
-      };
-      addUser(user);
+      await apiRegister({ name: name.trim(), username: username.trim(), email: email.trim(), password });
       setDone(true);
       toast.success("Request submitted");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally { setBusy(false); }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none opacity-[0.12]">
-        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-info blur-3xl" />
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-success blur-3xl" />
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12 relative overflow-hidden ambient-bg">
       <Card className="w-full max-w-sm relative z-10 glass-panel border-0">
         <CardContent className="p-8">
           <div className="flex flex-col items-center text-center mb-6">
